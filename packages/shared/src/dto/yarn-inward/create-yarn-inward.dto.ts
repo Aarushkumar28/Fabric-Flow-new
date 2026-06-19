@@ -10,8 +10,8 @@ export const CreateYarnInwardSchema = z.object({
   rlVl: z.enum(['RL', 'VL']).optional(),
   description: z.string().optional(),
   numBags: z.number().int().positive().optional(),
-  bagWeight: z.number().positive().optional(), // default 60 in service
-  ratePerKg: z.number().positive(),
+  bagWeight: z.number().min(0).optional(), // default 60 in service
+  ratePerKg: z.number().min(0),
   cgstRate: z.number().min(0).optional(), // default 2.5
   sgstRate: z.number().min(0).optional(), // default 2.5
   purchaseAccount: z.string().optional(),
@@ -19,7 +19,7 @@ export const CreateYarnInwardSchema = z.object({
   purchaseOrderId: z.string().optional(),
   millInvoiceNo:   z.string().optional(),
   millDcNo:        z.string().optional(),
-  receivedWeight:  z.number().positive().optional(),
+  receivedWeight:  z.number().min(0).optional(),
   status:          z.string().optional(),
 });
 

@@ -43,9 +43,10 @@ export class PurchaseOrderItemDto {
 }
 
 export class CreatePurchaseOrderDto {
+  // poNumber is now auto-generated server-side — not required from client
   @IsString()
-  @IsNotEmpty()
-  poNumber: string;
+  @IsOptional()
+  poNumber?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -127,6 +128,14 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   @Type(() => Number)
   knitterId?: number;
+
+  /**
+   * FB No. — only used when poType = 'GREY_FABRIC'.
+   * Distinct from HF Code which is used for YARN POs.
+   */
+  @IsString()
+  @IsOptional()
+  fbNo?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

@@ -19,7 +19,7 @@ const SELECT_CLASS =
 
 export default function YarnPage() {
   const queryClient = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [editLot, setEditLot] = useState<YarnLot | null>(null);
   const [searchHF, setSearchHF] = useState('');
   const [selectedKnitterId, setSelectedKnitterId] = useState<string>('');
@@ -46,23 +46,13 @@ export default function YarnPage() {
     queryFn: async () => (await api.get<Knitter[]>('/knitters')).data,
   });
 
-  const createMutation = useMutation({
-    mutationFn: (form: YarnLotFormData) => api.post('/yarn-lots', form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['yarn-lots'] });
-      toast.success('Yarn lot created');
-      setCreateOpen(false);
-    },
-    onError: () => toast.error('Failed to create yarn lot'),
-  });
-
   const updateMutation = useMutation({
     mutationFn: ({ id, ...body }: { id: number } & Partial<YarnLotFormData>) =>
       api.patch(`/yarn-lots/${id}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['yarn-lots'] });
       toast.success('Yarn lot updated');
-      setCreateOpen(false);
+      setEditOpen(false);
       setEditLot(null);
     },
     onError: () => toast.error('Update failed'),
@@ -77,7 +67,7 @@ export default function YarnPage() {
     onError: () => toast.error('Delete failed'),
   });
 
-  const openEdit = (lot: YarnLot) => { setEditLot(lot); setCreateOpen(true); };
+  const openEdit = (lot: YarnLot) => { setEditLot(lot); setEditOpen(true); };
   const confirmDelete = (id: number) => {
     if (window.confirm('Delete this yarn lot?')) deleteMutation.mutate(id);
   };
@@ -95,12 +85,9 @@ export default function YarnPage() {
               {isLoading ? 'Loading…' : `${lots.length} lot${lots.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button
-            onClick={() => { setEditLot(null); setCreateOpen(true); }}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all duration-200"
-          >
-            <Package2 className="h-4 w-4" /> Add Yarn Lot
-          </button>
+          {/* Add Yarn Lot button removed — yarn lots are created automatically
+              via the PO → Yarn Inward → RECEIVED transition to ensure
+              every lot is traceable to a Purchase Order. */}
         </div>
 
         {/* Search & Filter Bar */}
@@ -269,25 +256,24 @@ export default function YarnPage() {
           )}
         </div>
 
-        {/* Create / Edit Dialog */}
-        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setEditLot(null); }}>
+        {/* Edit Dialog — only opens when editing an existing lot */}
+        <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) setEditLot(null); }}>
           <DialogContent className="max-w-lg bg-slate-900 border-slate-700">
             <DialogHeader>
               <DialogTitle className="text-slate-100 flex items-center gap-2">
                 <Package2 className="h-5 w-5 text-emerald-400" />
-                {editLot ? 'Edit Yarn Lot' : 'Add New Yarn Lot'}
+                Edit Yarn Lot
               </DialogTitle>
             </DialogHeader>
             <div className="mt-2">
               <YarnLotForm
-                key={editLot?.id || 'new'}
+                key={editLot?.id ?? 'edit'}
                 initial={editLot}
                 mills={mills}
                 onSubmit={(data: YarnLotFormData) => {
                   if (editLot) updateMutation.mutate({ id: editLot.id, ...data });
-                  else createMutation.mutate(data);
                 }}
-                isSubmitting={createMutation.isPending || updateMutation.isPending}
+                isSubmitting={updateMutation.isPending}
               />
             </div>
           </DialogContent>

@@ -43,4 +43,9 @@ export class PurchaseOrdersController {
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
+
+  @Patch(':id/cancel')
+  cancel(@Param('id') id: string) {
+    return this.service.cancel(id);
+  }
 }

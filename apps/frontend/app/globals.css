@@ -201,3 +201,18 @@
     @apply font-sans;
   }
 }
+
+/*
+ * ── PDF PRINT TEMPLATE OVERRIDE ─────────────────────────────────────────────
+ * html2canvas (used by html2pdf.js) cannot parse oklch() color values produced
+ * by Tailwind v4's CSS variable tokens. Force all elements inside the PDF
+ * capture container to use literal rgb/hex colors so html2canvas can render
+ * them correctly. These rules only apply to the hidden #po-print template and
+ * do not affect the rest of the UI.
+ */
+#po-print,
+#po-print * {
+  color: rgb(15, 23, 42) !important;
+  background-color: rgb(255, 255, 255) !important;
+  border-color: rgb(226, 232, 240) !important;
+}

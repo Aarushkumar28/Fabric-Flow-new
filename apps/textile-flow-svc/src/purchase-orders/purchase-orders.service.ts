@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseOrderDto, PurchaseOrderItemDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
@@ -6,6 +6,30 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 @Injectable()
 export class PurchaseOrdersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Auto-generates the next sequential PO number server-side.
+   * Format: PO-0001, PO-0002 … (or FPO-0001 for Fabric POs)
+   *
+   * NOTE: Uses findFirst with ORDER BY createdAt DESC — appropriate for an
+   * internal low-concurrency tool. For strict atomic uniqueness under
+   * concurrent load, replace with a Postgres SEQUENCE.
+   */
+  private async generateNextPoNumber(poType?: string): Promise<string> {
+    const prefix = poType === 'GREY_FABRIC' ? 'FPO' : 'PO';
+    const lastPo = await this.prisma.purchaseOrder.findFirst({
+      where: { poNumber: { startsWith: `${prefix}-` } },
+      orderBy: { createdAt: 'desc' },
+    });
+    let nextSeq = 1;
+    if (lastPo) {
+      const match = lastPo.poNumber.match(/(\d+)$/);
+      if (match) nextSeq = parseInt(match[1], 10) + 1;
+    }
+    return `${prefix}-${String(nextSeq).padStart(4, '0')}`;
+  }
 
   async create(dto: CreatePurchaseOrderDto) {
     const {
@@ -23,13 +47,43 @@ export class PurchaseOrdersService {
       totalFabricWeight,
       millId,
       knitterId,
+      fbNo,
       ...rest
     } = dto;
+
+    // ── Issue 4: Enforce unique HF Code ──────────────────────────────────────
+    if (rest.hfCode) {
+      const existingHf = await this.prisma.purchaseOrder.findFirst({
+        where: { hfCode: rest.hfCode },
+      });
+      if (existingHf) {
+        throw new BadRequestException(
+          `HF Code "${rest.hfCode}" is already used on PO ${existingHf.poNumber}`,
+        );
+      }
+    }
+
+    // ── Issue 9: Enforce unique FB No. for Fabric POs ────────────────────────
+    if (poType === 'GREY_FABRIC' && fbNo) {
+      const existingFb = await this.prisma.purchaseOrder.findFirst({
+        where: { fbNo, poType: 'GREY_FABRIC' },
+      });
+      if (existingFb) {
+        throw new BadRequestException(
+          `FB No. "${fbNo}" is already used on PO ${existingFb.poNumber}`,
+        );
+      }
+    }
+
+    // ── Issue 7: Auto-generate sequential PO number ──────────────────────────
+    const poNumber = await this.generateNextPoNumber(poType);
 
     return this.prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.create({
         data: {
           ...rest,
+          poNumber,
+          fbNo: fbNo ?? null,
           date: new Date(date),
           deliveryDate: new Date(deliveryDate),
           poType: poType || 'YARN',
@@ -60,20 +114,18 @@ export class PurchaseOrdersService {
         },
       });
 
-      // ── Auto-create YarnInward from PO ───────────────────────────────────
+      // ── Auto-create YarnInward from PO ────────────────────────────────────
       let inwardLinkWarning: string | null = null;
 
-      if (!dto.poType || dto.poType === 'YARN') {
+      if (!poType || poType === 'YARN') {
         const firstItem = items[0];
 
-        // Resolve Mill: prefer explicit millId, fall back to name matching
         const mill = dto.millId
           ? await tx.mill.findUnique({ where: { id: dto.millId } })
           : await tx.mill.findFirst({
               where: { name: { contains: rest.supplierName ?? '', mode: 'insensitive' } },
             });
 
-        // Resolve Knitter: prefer explicit knitterId, fall back to name matching
         const knitter = dto.knitterId
           ? await tx.knitter.findUnique({ where: { id: dto.knitterId } })
           : dto.deliveryName
@@ -95,32 +147,30 @@ export class PurchaseOrdersService {
 
           await tx.yarnInward.create({
             data: {
-              status:             'PENDING',
-              purchaseOrderId:    po.id,
-              receiptDate:        new Date(dto.deliveryDate),
-              millId:             mill.id,
-              deliveryKnitterId:  knitter.id,
-              hfBatch:            po.hfCode,
-              yarnCount:          firstItem.count ?? null,
-              yarnQuality:        firstItem.quality ?? null,
-              numBags:            bags,
-              bagWeight:          bagWeight,
-              totalWeight:        totalWeight,
-              ratePerKg:          rate,
-              cgstRate:           cgst,
-              sgstRate:           sgst,
-              cgstAmount:         cgstAmt,
-              sgstAmount:         sgstAmt,
-              totalCost:          taxable + cgstAmt + sgstAmt,
-              purchaseAccount:    'C.N.T.LLP',
-              receivedWeight:     null,
-              millInvoiceNo:      null,
-              millDcNo:           null,
+              status:            'PENDING',
+              purchaseOrderId:   po.id,
+              receiptDate:       new Date(dto.deliveryDate),
+              millId:            mill.id,
+              deliveryKnitterId: knitter.id,
+              hfBatch:           po.hfCode,
+              yarnCount:         firstItem.count ?? null,
+              yarnQuality:       firstItem.quality ?? null,
+              numBags:           bags,
+              bagWeight:         bagWeight,
+              totalWeight:       totalWeight,
+              ratePerKg:         rate,
+              cgstRate:          cgst,
+              sgstRate:          sgst,
+              cgstAmount:        cgstAmt,
+              sgstAmount:        sgstAmt,
+              totalCost:         taxable + cgstAmt + sgstAmt,
+              purchaseAccount:   'C.N.T.LLP',
+              receivedWeight:    null,
+              millInvoiceNo:     null,
+              millDcNo:          null,
             },
           });
         } else {
-          // Non-fatal: surface a warning so the frontend can show a yellow toast,
-          // but never throw — the PO itself must always be saved.
           const missingParts: string[] = [];
           if (!mill) missingParts.push(`mill not found for "${rest.supplierName}" (try passing millId)`);
           if (!knitter) missingParts.push(`knitter not found for "${dto.deliveryName ?? 'no delivery name'}" (try passing knitterId)`);
@@ -130,7 +180,6 @@ export class PurchaseOrdersService {
         }
       }
 
-      // Attach warning to the response so the frontend can surface it
       return { ...po, inwardLinkWarning };
     });
   }
@@ -158,7 +207,6 @@ export class PurchaseOrdersService {
   }
 
   async update(id: string, dto: UpdatePurchaseOrderDto) {
-    // Verify record exists first
     await this.findOne(id);
 
     const {
@@ -178,7 +226,6 @@ export class PurchaseOrdersService {
     } = dto;
 
     return this.prisma.$transaction(async (tx) => {
-      // Replace items wholesale when provided
       if (items !== undefined) {
         await tx.purchaseOrderItem.deleteMany({
           where: { purchaseOrderId: id },
@@ -222,6 +269,41 @@ export class PurchaseOrdersService {
       });
 
       return po;
+    });
+  }
+
+  // ── Issue 8: Cancel PO ───────────────────────────────────────────────────
+  async cancel(id: string) {
+    const po = await this.prisma.purchaseOrder.findUnique({ where: { id } });
+    if (!po) throw new NotFoundException('Purchase Order not found');
+    if (po.status === 'CANCELLED') {
+      throw new BadRequestException('This PO is already cancelled');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedPo = await tx.purchaseOrder.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+      });
+
+      // Reflect in the linked YarnInward if it hasn't been received yet
+      const linkedInward = await tx.yarnInward.findFirst({
+        where: { purchaseOrderId: id },
+      });
+      if (linkedInward) {
+        if (linkedInward.status === 'RECEIVED') {
+          throw new BadRequestException(
+            'Cannot cancel this PO — yarn has already been received against it. ' +
+            'Cancel is only allowed while status is PENDING.',
+          );
+        }
+        await tx.yarnInward.update({
+          where: { id: linkedInward.id },
+          data: { status: 'CANCELLED' },
+        });
+      }
+
+      return updatedPo;
     });
   }
 

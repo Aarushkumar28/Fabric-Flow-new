@@ -182,6 +182,17 @@ export class YarnInwardService {
       });
       if (!existing) throw new NotFoundException('Yarn inward not found');
 
+      // ── Issue 3: Received weight cannot exceed ordered weight ────────────
+      if (dto.receivedWeight != null) {
+        const orderedWeight = Number(existing.totalWeight);
+        if (Number(dto.receivedWeight) > orderedWeight) {
+          throw new BadRequestException(
+            `Received weight (${dto.receivedWeight} kg) cannot exceed ` +
+            `the ordered PO weight (${orderedWeight} kg)`,
+          );
+        }
+      }
+
       // Check if transitioning from PENDING to RECEIVED
       const wasPending = existing.status === 'PENDING';
       const isNowReceived = dto.receivedWeight != null;

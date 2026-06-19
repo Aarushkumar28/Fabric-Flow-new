@@ -1,11 +1,9 @@
 import { z } from 'zod';
-import { gstinRegex } from '../constants';
+import { gstinRegex, optionalString } from '../constants';
 
-const pincodeSchema = z
-  .string()
-  .regex(/^\d{6}$/, 'Pincode must be 6 digits')
-  .optional()
-  .or(z.literal(''));
+const pincodeSchema = optionalString(
+  z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits')
+);
 
 export const CreateDyerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -14,13 +12,12 @@ export const CreateDyerSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   pincode: pincodeSchema,
-  email: z.string().email().optional().or(z.literal('')),
+  email: optionalString(z.string().email()),
   phone: z.string().optional(),
-  gstin: z
-    .string()
-    .length(15, 'GSTIN must be exactly 15 characters')
-    .regex(gstinRegex, 'Invalid GSTIN format')
-    .optional()
-    .or(z.literal('')),
+  gstin: optionalString(
+    z.string()
+      .length(15, 'GSTIN must be exactly 15 characters')
+      .regex(gstinRegex, 'Invalid GSTIN format')
+  ),
 });
 export type CreateDyerDto = z.infer<typeof CreateDyerSchema>;

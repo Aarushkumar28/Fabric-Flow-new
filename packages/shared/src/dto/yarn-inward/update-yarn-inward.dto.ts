@@ -10,8 +10,8 @@ export const UpdateYarnInwardSchema = z.object({
   rlVl: z.enum(['RL', 'VL']).optional(),
   description: z.string().optional(),
   numBags: z.number().int().positive().optional(),
-  bagWeight: z.number().positive().optional(),
-  ratePerKg: z.number().positive().optional(),
+  bagWeight: z.number().min(0).optional(),
+  ratePerKg: z.number().min(0).optional(),
   cgstRate: z.number().min(0).optional(),
   sgstRate: z.number().min(0).optional(),
   purchaseAccount: z.string().optional(),
@@ -19,7 +19,7 @@ export const UpdateYarnInwardSchema = z.object({
   purchaseOrderId: z.string().optional(),
   millInvoiceNo:   z.string().optional(),
   millDcNo:        z.string().optional(),
-  receivedWeight:  z.number().positive().optional(),
+  receivedWeight:  z.number().min(0).optional(),
   status:          z.string().optional(),
 });
 

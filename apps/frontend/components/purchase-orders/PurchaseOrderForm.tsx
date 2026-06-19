@@ -44,8 +44,8 @@ interface POItem {
 }
 
 interface POFormData {
-  poNumber: string;
   hfCode: string;
+  fbNo: string;
   agent: string;
   date: string;
   deliveryDate: string;
@@ -65,8 +65,8 @@ interface POFormData {
 }
 
 const EMPTY_FORM: POFormData = {
-  poNumber: '',
   hfCode: '',
+  fbNo: '',
   agent: '',
   date: new Date().toISOString().split('T')[0],
   deliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -103,6 +103,7 @@ export default function PurchaseOrderForm() {
   const [manualSupplier, setManualSupplier] = useState(false);
   const [printConfirmPO, setPrintConfirmPO] = useState<PurchaseOrder | null>(null);
   const [printingPDF, setPrintingPDF] = useState(false);
+  const [hfCodeError, setHfCodeError] = useState<string | null>(null);
   // Track exact IDs from dropdown selection for reliable inward auto-linking
   const [selectedMillId, setSelectedMillId] = useState<number | null>(null);
   const [selectedKnitterId, setSelectedKnitterId] = useState<number | null>(null);
@@ -141,11 +142,7 @@ export default function PurchaseOrderForm() {
       .filter(Boolean).join(', ');
   };
 
-  // Combined supplier list: mills + knitters
-  const supplierOptions = [
-    ...mills.map(m => ({ ...m, type: 'Mill' as const })),
-    ...knitters.map(k => ({ ...k, type: 'Knitter' as const })),
-  ];
+  // Combined supplier list logic removed since it is handled inline in the template
 
   const handleSupplierSelect = (val: string) => {
     if (val === '__manual__') {
@@ -198,16 +195,21 @@ export default function PurchaseOrderForm() {
       form.reset(EMPTY_FORM);
       setSelectedMillId(null);
       setSelectedKnitterId(null);
+      setHfCodeError(null);
     },
     onError: (err: unknown) => {
       console.error('[PO Create Error]', err);
       const axiosErr = err as { response?: { data?: { message?: string | string[] }; status?: number } };
       const msg = axiosErr?.response?.data?.message;
       if (Array.isArray(msg)) {
-        // NestJS ValidationPipe returns structured message array — surface them
         toast.error('Validation errors: ' + msg.join('; '));
       } else if (typeof msg === 'string') {
-        toast.error(msg);
+        // Surface HF Code / FB No. duplicate errors near the field
+        if (msg.includes('HF Code') || msg.includes('FB No.')) {
+          setHfCodeError(msg);
+        } else {
+          toast.error(msg);
+        }
       } else {
         toast.error('Failed to save Purchase Order to database');
       }
@@ -238,6 +240,7 @@ export default function PurchaseOrderForm() {
 
   const handleConfirm = async () => {
     const formData = getValues();
+    setHfCodeError(null);
 
     // Include poType, fabric-specific fields, and resolved IDs in the payload
     const payload: CreatePurchaseOrderInput = {
@@ -247,10 +250,15 @@ export default function PurchaseOrderForm() {
       // Pass exact IDs when available — eliminates fuzzy string matching on the backend
       ...(selectedMillId !== null && { millId: selectedMillId }),
       ...(selectedKnitterId !== null && { knitterId: selectedKnitterId }),
+      // FB No. for Fabric POs
+      ...(poType === 'GREY_FABRIC' && formData.fbNo && { fbNo: formData.fbNo }),
     };
+    // Remove poNumber from payload — server generates it auto-sequentially
+    const payloadWithoutPoNumber: Partial<CreatePurchaseOrderInput> & { poNumber?: string } = { ...payload };
+    delete payloadWithoutPoNumber.poNumber;
 
     // 1. Save to the database — returns the newly created PO with its real `id`
-    const savedPO = await createMutation.mutateAsync(payload);
+    const savedPO = await createMutation.mutateAsync(payloadWithoutPoNumber as CreatePurchaseOrderInput);
 
     // 2. Wait for the list to fully refetch so the hidden print template
     //    for this PO is rendered in the DOM before we try to capture it.
@@ -288,8 +296,30 @@ export default function PurchaseOrderForm() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.patch(`/purchase-orders/${id}/cancel`);
+    },
+    onSuccess: () => {
+      toast.success('Purchase Order cancelled successfully!');
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    },
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const msg = axiosErr?.response?.data?.message || 'Failed to cancel Purchase Order';
+      toast.error(msg);
+    },
+  });
+
   const confirmDelete = (id: string) => {
     if (window.confirm('Delete this purchase order?')) deleteMutation.mutate(id);
+  };
+
+  const confirmCancel = (po: PurchaseOrder) => {
+    if (po.status === 'CANCELLED') return;
+    if (window.confirm(`Are you sure you want to cancel PO ${po.poNumber}? This will also cancel any pending Yarn Inward.`)) {
+      cancelMutation.mutate(String(po.id));
+    }
   };
 
   // Grand totals computed for display
@@ -331,25 +361,35 @@ export default function PurchaseOrderForm() {
           </div>
           <form onSubmit={handleSubmit(() => setPreviewOpen(true))} className="space-y-6">
             
-            {/* HEADER GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* HEADER GRID — PO Number is auto-generated server-side (Issues 7) */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <Label className="text-slate-300 font-semibold text-xs uppercase tracking-wider">PO Number *</Label>
-                <Input
-                  className="bg-slate-800 border-slate-700 mt-1 text-white focus:ring-primary"
-                  placeholder="e.g. PO-001"
-                  required
-                  {...register('poNumber')}
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 font-semibold text-xs uppercase tracking-wider">HF Code *</Label>
-                <Input
-                  className="bg-slate-800 border-slate-700 mt-1 text-white focus:ring-primary"
-                  placeholder="e.g. HF-72"
-                  required
-                  {...register('hfCode')}
-                />
+                {/* Issue 9: Fabric PO uses FB No., Yarn PO uses HF Code */}
+                <Label className="text-slate-300 font-semibold text-xs uppercase tracking-wider">
+                  {poType === 'GREY_FABRIC' ? 'FB No. *' : 'HF Code *'}
+                </Label>
+                {poType === 'GREY_FABRIC' ? (
+                  <Input
+                    className="bg-slate-800 border-slate-700 mt-1 text-white focus:ring-primary"
+                    placeholder="e.g. FB-001"
+                    required
+                    {...register('fbNo')}
+                    onChange={() => setHfCodeError(null)}
+                  />
+                ) : (
+                  <Input
+                    className={`bg-slate-800 border-slate-700 mt-1 text-white focus:ring-primary ${
+                      hfCodeError ? 'border-rose-500' : ''
+                    }`}
+                    placeholder="e.g. HF-72"
+                    required
+                    {...register('hfCode')}
+                    onChange={() => setHfCodeError(null)}
+                  />
+                )}
+                {hfCodeError && (
+                  <p className="text-rose-400 text-xs mt-1">{hfCodeError}</p>
+                )}
               </div>
               <div>
                 <Label className="text-slate-300 font-semibold text-xs uppercase tracking-wider">Agent</Label>
@@ -839,22 +879,36 @@ export default function PurchaseOrderForm() {
                 <TableHeader className="bg-slate-800/50">
                   <TableRow className="hover:bg-slate-800/50 border-slate-800">
                     <TableHead className="text-slate-300 font-semibold">PO Number</TableHead>
-                    <TableHead className="text-slate-300 font-semibold">HF Code</TableHead>
+                    <TableHead className="text-slate-300 font-semibold">HF Code / FB No.</TableHead>
+                    <TableHead className="text-slate-300 font-semibold">Type</TableHead>
                     <TableHead className="text-slate-300 font-semibold">Supplier Name</TableHead>
                     <TableHead className="text-slate-300 font-semibold">Date</TableHead>
-                    <TableHead className="text-slate-300 font-semibold">Agent</TableHead>
+                    <TableHead className="text-slate-300 font-semibold text-center">Status</TableHead>
                     <TableHead className="text-slate-300 font-semibold text-center">No. of Items</TableHead>
                     <TableHead className="text-slate-300 font-semibold text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-800">
                   {purchaseOrders.map((po) => (
-                    <TableRow key={po.id} className="hover:bg-slate-800/20 border-slate-800 text-white">
+                    <TableRow key={po.id} className={`hover:bg-slate-800/20 border-slate-800 text-white ${po.status === 'CANCELLED' ? 'opacity-50' : ''}`}>
                       <TableCell className="font-semibold">{po.poNumber}</TableCell>
-                      <TableCell>{po.hfCode}</TableCell>
+                      <TableCell>{po.poType === 'GREY_FABRIC' ? po.fbNo || '—' : po.hfCode}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
+                          po.poType === 'GREY_FABRIC' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-blue-500/20 text-blue-300'
+                        }`}>
+                          {po.poType === 'GREY_FABRIC' ? 'FABRIC' : 'YARN'}
+                        </span>
+                      </TableCell>
                       <TableCell className="max-w-[200px] truncate">{po.supplierName}</TableCell>
                       <TableCell>{new Date(po.date).toLocaleDateString()}</TableCell>
-                      <TableCell>{po.agent || '—'}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
+                          po.status === 'CANCELLED' ? 'bg-slate-700 text-slate-400' : 'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {po.status || 'ACTIVE'}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-center font-bold">{po.items?.length || 0}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex gap-1.5 justify-center">
@@ -865,6 +919,15 @@ export default function PurchaseOrderForm() {
                             onClick={() => setPrintConfirmPO(po)}
                           >
                             <Download className="w-4 h-4" /> PDF
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-orange-400 hover:text-orange-300 hover:bg-slate-800 flex items-center gap-1"
+                            onClick={() => confirmCancel(po)}
+                            disabled={cancelMutation.isPending || po.status === 'CANCELLED'}
+                          >
+                            <XCircle className="w-4 h-4" /> Cancel
                           </Button>
                           <Button
                             size="sm"
@@ -1055,13 +1118,13 @@ export default function PurchaseOrderForm() {
                       await generatePOPDF(`po-pdf-overlay-${po.id}`, po.poNumber);
                       toast.dismiss();
                       toast.success('PDF generated!');
-                      setPrintConfirmPO(null);
                     } catch (err) {
                       console.error(err);
                       toast.dismiss();
                       toast.error('Error generating PDF');
                     } finally {
                       setPrintingPDF(false);
+                      setPrintConfirmPO(null); // Always close modal — prevents navigation freeze
                     }
                   }}
                 >

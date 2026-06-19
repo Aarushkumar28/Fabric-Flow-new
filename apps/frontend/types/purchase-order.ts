@@ -18,6 +18,7 @@ export interface PurchaseOrder {
   id: string | number;
   poNumber: string;
   hfCode?: string;
+  fbNo?: string;
   date: string;
   supplierName?: string;
   supplierAddress?: string;
@@ -45,6 +46,7 @@ export interface PurchaseOrder {
 export interface CreatePurchaseOrderInput {
   poNumber?: string;
   hfCode?: string;
+  fbNo?: string;
   supplierName?: string;
   supplierAddress?: string;
   supplierGST?: string;

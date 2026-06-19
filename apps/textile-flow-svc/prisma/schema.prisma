@@ -558,8 +558,10 @@ model GreyFabricInward {
 
 model PurchaseOrder {
   id              String   @id @default(cuid())
-  poNumber        String   @map("po_number")
-  hfCode          String   @map("hf_code")
+  poNumber        String   @unique @map("po_number")
+  hfCode          String   @unique @map("hf_code")
+  fbNo            String?  @map("fb_no")
+  status          String   @default("ACTIVE") @map("status")
   supplierName    String   @map("supplier_name")
   supplierAddress String   @map("supplier_address")
   supplierGST     String   @map("supplier_gst")
@@ -576,11 +578,13 @@ model PurchaseOrder {
   fabricGsm       String?  @map("fabric_gsm")
   totalFabricWeight Float? @map("total_fabric_weight")
   createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
   items           PurchaseOrderItem[]
   yarnInwards     YarnInward[]
 
   @@map("purchase_orders")
 }
+
 
 model PurchaseOrderItem {
   id               String        @id @default(cuid())

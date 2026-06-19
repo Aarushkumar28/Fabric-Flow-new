@@ -7,6 +7,7 @@ import {
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { normalizeEmptyStrings } from './normalize-empty-strings.util';
 
 export type PrismaTransaction = Prisma.TransactionClient;
 
@@ -34,6 +35,28 @@ export class PrismaService
 
     const adapter = new PrismaPg(pool);
     super({ adapter });
+
+    const extendedClient = this.$extends({
+      query: {
+        $allModels: {
+          async $allOperations({ operation, args, query }) {
+            if ((operation === 'create' || operation === 'update') && (args as any).data) {
+              (args as any).data = normalizeEmptyStrings((args as any).data);
+            }
+            return query(args);
+          },
+        },
+      },
+    });
+
+    return new Proxy(this, {
+      get: (target, prop) => {
+        if (prop in extendedClient) {
+          return (extendedClient as any)[prop];
+        }
+        return (target as any)[prop];
+      },
+    });
   }
 
   async onModuleInit() {
