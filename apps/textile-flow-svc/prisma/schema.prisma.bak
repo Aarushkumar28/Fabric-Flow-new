@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Mill {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  address       String?
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  YarnLot YarnLot[]
+
+  @@map("mills")
+}
+
+model Knitter {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  address       String?
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  KnitterStock   KnitterStock[]
+  DeliveryNote   DeliveryNote[]
+  KnitterProgram KnitterProgram[]
+
+  @@map("knitters")
+}
+
+model Dyer {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  address       String?
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  DyeingProgram DyeingProgram[]
+
+  @@map("dyers")
+}
+
+model Compacter {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  address       String?
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("compacters")
+}
+
+model Colour {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  hexCode     String?  @map("hex_code")
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  YarnLot        YarnLot[]
+  KnitterProgram KnitterProgram[]
+  DyeingProgram  DyeingProgram[]
+
+  @@map("colours")
+}
+
+model WashType {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  DyeingProgram DyeingProgram[]
+
+  @@map("wash_types")
+}
+
+model YarnQuality {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  composition String?
+  count       String?
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  YarnLot        YarnLot[]
+  KnitterProgram KnitterProgram[]
+
+  @@map("yarn_qualities")
+}
+
+model YarnLot {
+  id              String          @id @default(uuid())
+  lotNumber       String          @unique @map("lot_number")
+  millId          String          @map("mill_id")
+  yarnQualityId   String          @map("yarn_quality_id")
+  colourId        String          @map("colour_id")
+  grossWeight     Float           @map("gross_weight")
+  netWeight       Float           @map("net_weight")
+  availableWeight Float           @map("available_weight")
+  cones           Int
+  receivedDate    DateTime        @map("received_date")
+  remarks         String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  mill            Mill                @relation(fields: [millId], references: [id])
+  yarnQuality     YarnQuality         @relation(fields: [yarnQualityId], references: [id])
+  colour          Colour              @relation(fields: [colourId], references: [id])
+  KnitterStock    KnitterStock[]
+  DeliveryNoteItem DeliveryNoteItem[]
+
+  @@map("yarn_lots")
+}
+
+model KnitterStock {
+  id            String         @id @default(uuid())
+  knitterId     String         @map("knitter_id")
+  yarnLotId     String         @map("yarn_lot_id")
+  quantity      Float
+  receivedAt    DateTime       @default(now()) @map("received_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  knitter       Knitter        @relation(fields: [knitterId], references: [id])
+  yarnLot       YarnLot        @relation(fields: [yarnLotId], references: [id])
+
+  @@map("knitter_stocks")
+}
+
+model DeliveryNote {
+  id           String             @id @default(uuid())
+  dcNo         String             @unique @map("dc_no")
+  transferDcNo String?            @map("transfer_dc_no")
+  knitterId    String             @map("knitter_id")
+  deliveryDate DateTime           @map("delivery_date")
+  remarks      String?
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  knitter      Knitter            @relation(fields: [knitterId], references: [id])
+  items        DeliveryNoteItem[]
+
+  @@map("delivery_notes")
+}
+
+model DeliveryNoteItem {
+  id             String       @id @default(uuid())
+  deliveryNoteId String       @map("delivery_note_id")
+  yarnLotId      String       @map("yarn_lot_id")
+  sentWeight     Float        @map("sent_weight")
+  cones          Int
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  deliveryNote   DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+  yarnLot        YarnLot      @relation(fields: [yarnLotId], references: [id])
+
+  @@map("delivery_note_items")
+}
+
+model KnitterProgram {
+  id              String          @id @default(uuid())
+  programNo       String          @unique @map("program_no")
+  memoNo          String?         @map("memo_no")
+  knitterId       String          @map("knitter_id")
+  colourId        String          @map("colour_id")
+  yarnQualityId   String          @map("yarn_quality_id")
+  startDate       DateTime        @map("start_date")
+  expectedEndDate DateTime?       @map("expected_end_date")
+  status          String          @default("ACTIVE")
+  remarks         String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  knitter         Knitter             @relation(fields: [knitterId], references: [id])
+  colour          Colour              @relation(fields: [colourId], references: [id])
+  yarnQuality     YarnQuality         @relation(fields: [yarnQualityId], references: [id])
+  GreyFabricLot   GreyFabricLot[]
+
+  @@map("knitter_programs")
+}
+
+model GreyFabricLot {
+  id               String         @id @default(uuid())
+  lotNumber        String         @unique @map("lot_number")
+  knitterProgramId String         @map("knitter_program_id")
+  receivedDate     DateTime       @map("received_date")
+  grossWeight      Float          @map("gross_weight")
+  netWeight        Float          @map("net_weight")
+  rolls            Int
+  remarks          String?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  knitterProgram   KnitterProgram @relation(fields: [knitterProgramId], references: [id])
+  DyeingProgram    DyeingProgram[]
+
+  @@map("grey_fabric_lots")
+}
+
+model DyeingProgram {
+  id             String         @id @default(uuid())
+  programNo      String         @unique @map("program_no")
+  dyerId         String         @map("dyer_id")
+  colourId       String         @map("colour_id")
+  washTypeId     String         @map("wash_type_id")
+  greyFabricLotId String        @map("grey_fabric_lot_id")
+  startDate      DateTime       @map("start_date")
+  status         String         @default("ACTIVE")
+  remarks        String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  dyer           Dyer           @relation(fields: [dyerId], references: [id])
+  colour         Colour         @relation(fields: [colourId], references: [id])
+  washType       WashType       @relation(fields: [washTypeId], references: [id])
+  greyFabricLot  GreyFabricLot  @relation(fields: [greyFabricLotId], references: [id])
+
+  @@map("dyeing_programs")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tableName   String   @map("table_name")
+  recordId    String   @map("record_id")
+  action      Action
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  performedBy String   @map("performed_by")
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  @@index([tableName, recordId])
+  @@index([performedAt])
+  @@map("audit_logs")
+}
+
+enum Action {
+  CREATE
+  UPDATE
+  DELETE
+}

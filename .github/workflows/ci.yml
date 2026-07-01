@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  ci:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared DTOs
+        run: npx turbo run build --filter=@textile-flow/shared
+
+      - name: Prisma generate
+        run: npx turbo run db:generate --filter=textile-flow-svc
+        env:
+          DATABASE_URL: "postgresql://fabric:secret@localhost:5432/stub_db"
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: "1"
+          PRISMA_GENERATE_SKIP_AUTOINSTALL: "1"
+
+      - name: Lint
+        run: npx turbo run lint
+
+      - name: Build
+        run: npx turbo run build
+        env:
+          DATABASE_URL: "postgresql://fabric:secret@localhost:5432/stub_db"
