@@ -7,5 +7,6 @@ import { KnitterProgramsService } from './knitter-programs.service';
   imports: [PrismaModule],
   controllers: [KnitterProgramsController],
   providers: [KnitterProgramsService],
+  exports: [KnitterProgramsService],
 })
 export class KnitterProgramsModule {}

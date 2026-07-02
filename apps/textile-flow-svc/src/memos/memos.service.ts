@@ -8,6 +8,7 @@ import { dyeingStatusFromDc } from '../common/adapters/workflow-status.adapter';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { LotTrackerService } from '../lot-tracker/lot-tracker.service';
+import { KnitterProgramsService } from '../knitter-programs/knitter-programs.service';
 
 @Injectable()
 export class MemosService {
@@ -16,6 +17,7 @@ export class MemosService {
     private readonly workflowTransition: WorkflowTransitionService,
     private readonly inventoryService: InventoryService,
     private readonly lotTrackerService: LotTrackerService,
+    private readonly knitterProgramsService: KnitterProgramsService,
   ) {}
 
   async create(dto: CreateMemoDto) {
@@ -23,12 +25,13 @@ export class MemosService {
     const result = await this.prisma.$transaction(async (tx) => {
       const last = await tx.memo.findFirst({ orderBy: { memoNo: 'desc' } });
       const memoNo = dto.memoNo ?? (last?.memoNo ?? 39) + 1;
-      const fallbackDyer =
+
+      // Task 1: dyerId is the single source of truth — no per-line fallback
+      const dyerId =
         dto.dyerId ??
-        dto.lines.find((line) => line.preAssignedDyerId)?.preAssignedDyerId ??
         (await tx.dyer.findFirst({ orderBy: { id: 'asc' } }))?.id;
 
-      if (!fallbackDyer) {
+      if (!dyerId) {
         throw new BadRequestException('Dyer is required to create a memo');
       }
 
@@ -36,7 +39,7 @@ export class MemosService {
         data: {
           memoNo,
           issueDate: dto.issueDate ? new Date(dto.issueDate) : new Date(),
-          dyerId: fallbackDyer,
+          dyerId,
           remarks: dto.remarks,
         },
       });
@@ -44,7 +47,6 @@ export class MemosService {
       for (const line of dto.lines) {
         const resolved = await this.resolveMemoLine(tx, line);
         collectedLotNos.push(resolved.lotNo);
-        const lineDyerId = line.preAssignedDyerId ?? fallbackDyer;
         const initialStatus = dyeingStatusFromDc(null, null);
 
         const memoLine = await tx.memoLine.create({
@@ -73,12 +75,15 @@ export class MemosService {
             lotNo: resolved.lotNo,
             memoLineId: memoLine.id,
             hfCode: resolved.hfCode,
-            dyerId: lineDyerId,
+            // Task 1: single dyer from memo header — no per-line override
+            dyerId,
             colourId: finalColourId,
             initialWeight: line.sentWeight ?? resolved.sentWeight,
             sourceType: resolved.sourceType,
             status: initialStatus,
             noOfRolls: resolved.noOfRolls,
+            // companyDcNo auto-synced to lotNo for easy lookup
+            companyDcNo: resolved.lotNo,
           },
         });
 
@@ -177,6 +182,69 @@ export class MemosService {
     tx: PrismaTransaction,
     line: CreateMemoDto['lines'][number],
   ) {
+    // ─── Task 2b: explicit source enum routing ───────────────────────────────
+
+    // Option: PROGRAM_LOT — resolve via knitterProgramId → its latest AVAILABLE lot
+    if (line.knitterProgramId) {
+      const lot = await tx.greyFabricLot.findFirst({
+        where: {
+          knitterProgramId: line.knitterProgramId,
+          status: 'AVAILABLE',
+        },
+        include: {
+          knitterProgram: {
+            include: {
+              yarnUsages: { include: { yarnLot: true } },
+              yarnLot: true,
+            },
+          },
+        },
+        orderBy: { id: 'desc' },
+      });
+      if (!lot) {
+        throw new BadRequestException(
+          `No AVAILABLE grey fabric lot found for KnitterProgram #${line.knitterProgramId}`,
+        );
+      }
+
+      const hfCode = lot.knitterProgram?.yarnUsages?.length
+        ? lot.knitterProgram.yarnUsages.map((u) => u.yarnLot.hfCode).join(', ')
+        : lot.knitterProgram?.yarnLot?.hfCode;
+
+      return {
+        knittingLotId: undefined,
+        greyFabricLotId: lot.id,
+        lotNo: lot.lotNumber,
+        hfCode,
+        colourId: await this.firstColourId(tx),
+        sentWeight: Number(lot.greyWeight),
+        noOfRolls: lot.rollCount ?? undefined,
+        sourceType: 'KNITTED',
+      };
+    }
+
+    // Option: NEW_PROGRAM — create program + lot inline inside the same transaction
+    if (line.newProgram) {
+      const { program, greyFabricLot } =
+        await this.knitterProgramsService.createInTransaction(
+          tx,
+          line.newProgram,
+        );
+
+      return {
+        knittingLotId: undefined,
+        greyFabricLotId: greyFabricLot.id,
+        lotNo: greyFabricLot.lotNumber,
+        hfCode: undefined,
+        colourId: await this.firstColourId(tx),
+        sentWeight: line.sentWeight ?? Number(greyFabricLot.greyWeight),
+        noOfRolls: program.numRolls ?? undefined,
+        sourceType: 'KNITTED',
+      };
+    }
+
+    // ─── Legacy paths (unchanged for backward compat) ────────────────────────
+
     if (line.knittingLotId) {
       const lot = await tx.knittingLot.findUnique({
         where: { id: line.knittingLotId },
@@ -216,7 +284,14 @@ export class MemosService {
     if (line.greyFabricLotId) {
       const lot = await tx.greyFabricLot.findUnique({
         where: { id: line.greyFabricLotId },
-        include: { knitterProgram: { include: { yarnUsages: { include: { yarnLot: true } }, yarnLot: true } } },
+        include: {
+          knitterProgram: {
+            include: {
+              yarnUsages: { include: { yarnLot: true } },
+              yarnLot: true,
+            },
+          },
+        },
       });
       if (!lot) {
         throw new BadRequestException(
@@ -226,7 +301,9 @@ export class MemosService {
 
       let hfCodes = lot.knitterProgram?.yarnLot?.hfCode;
       if (lot.knitterProgram?.yarnUsages?.length) {
-        hfCodes = lot.knitterProgram.yarnUsages.map(u => u.yarnLot.hfCode).join(', ');
+        hfCodes = lot.knitterProgram.yarnUsages
+          .map((u) => u.yarnLot.hfCode)
+          .join(', ');
       }
 
       return {
@@ -251,7 +328,6 @@ export class MemosService {
 
       const sentWeight = line.sentWeight ?? yarnLot.availableWeight;
 
-      // Fix #6: Validate sentWeight against availableWeight
       if (sentWeight > yarnLot.availableWeight) {
         throw new BadRequestException(
           `Sent weight (${sentWeight}) exceeds available weight (${yarnLot.availableWeight}) for Yarn Lot ${yarnLot.id}`,
@@ -288,7 +364,7 @@ export class MemosService {
     }
 
     throw new BadRequestException(
-      'Memo line requires knittingLotId, greyFabricLotId, or yarnLotId + knitterId',
+      'Memo line requires one of: knitterProgramId, newProgram, knittingLotId, greyFabricLotId, or yarnLotId+knitterId',
     );
   }
 

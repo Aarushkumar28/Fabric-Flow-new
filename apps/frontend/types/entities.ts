@@ -191,6 +191,8 @@ export interface KnitterProgramYarnUsage {
 
 export interface KnitterProgram {
   id: number;
+  /// Sequential reference e.g. KP-0001
+  programNo?: string | null;
   knitterId: number;
   // Kept for backward compatibility
   yarnLotId?: number | null;

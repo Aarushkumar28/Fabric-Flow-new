@@ -5,12 +5,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class GreyFabricLotsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(status?: string) {
+  findAll(status?: string, source?: string) {
     return this.prisma.greyFabricLot.findMany({
-      where: status ? { status: status as never } : undefined,
+      where: {
+        ...(status ? { status } : {}),
+        ...(source ? { source: source as never } : {}),
+      },
       include: {
         knitter: true,
-        knitterProgram: { include: { yarnLot: true } },
+        knitterProgram: { include: { yarnLot: true, yarnUsages: { include: { yarnLot: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });

@@ -66,6 +66,10 @@ interface DyeingFormData {
   compacterId: string;
   colourId: string;
   lotNumber: string;
+  // Task 4: new fields
+  receivedGreyWeight: string;
+  greyReceivedDate: string;
+  sentWeightToCompacter: string;
 }
 
 const EMPTY_FORM: DyeingFormData = {
@@ -79,6 +83,9 @@ const EMPTY_FORM: DyeingFormData = {
   compacterId: '',
   colourId: '',
   lotNumber: '',
+  receivedGreyWeight: '',
+  greyReceivedDate: '',
+  sentWeightToCompacter: '',
 };
 
 const fmt = (v: number | null | undefined) =>
@@ -133,7 +140,7 @@ export default function DyeingPage() {
     setEditRecord(record);
     setFormData({
       knitterDcNo: record.knitterDcNo ?? '',
-      companyDcNo: record.companyDcNo ?? '',
+      companyDcNo: record.companyDcNo ?? record.lotNo,
       dyerJobNo: '',
       dyeingDeliveryNo: '',
       deliveryDate: record.dateGiven?.split('T')[0] ?? '',
@@ -142,6 +149,9 @@ export default function DyeingPage() {
       compacterId: String(record.compacterId ?? ''),
       colourId: String(record.colourId ?? ''),
       lotNumber: record.lotNo,
+      receivedGreyWeight: '',
+      greyReceivedDate: '',
+      sentWeightToCompacter: '',
     });
   };
 
@@ -154,6 +164,10 @@ export default function DyeingPage() {
     if (formData.deliveryDate) payload.dateGiven = formData.deliveryDate;
     if (formData.finalWeight) payload.finalWeight = parseFloat(formData.finalWeight);
     if (formData.compacterId) payload.compacterId = parseInt(formData.compacterId);
+    // Task 4: new fields
+    if (formData.receivedGreyWeight) payload.receivedGreyWeight = parseFloat(formData.receivedGreyWeight);
+    if (formData.greyReceivedDate) payload.greyReceivedDate = formData.greyReceivedDate;
+    if (formData.sentWeightToCompacter) payload.sentWeightToCompacter = parseFloat(formData.sentWeightToCompacter);
     updateMutation.mutate({ id: editRecord.id, ...payload });
   };
 
@@ -324,9 +338,12 @@ export default function DyeingPage() {
                     value={formData.knitterDcNo} onChange={(e) => setFormData({ ...formData, knitterDcNo: e.target.value })} />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Company DC Number (Job No)</Label>
-                  <Input placeholder="e.g. CNT-DC-001" className="bg-slate-800/80 border-slate-700/60 text-slate-200"
-                    value={formData.companyDcNo} onChange={(e) => setFormData({ ...formData, companyDcNo: e.target.value })} />
+                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Company DC Number</Label>
+                  <div className="flex items-center gap-2">
+                    <Input readOnly className="bg-slate-700/40 border-slate-700/40 text-slate-400 cursor-not-allowed flex-1"
+                      value={formData.companyDcNo || editRecord?.lotNo || ''} />
+                    <span className="text-xs text-slate-500">(auto)</span>
+                  </div>
                 </div>
               </div>
 
@@ -373,17 +390,36 @@ export default function DyeingPage() {
                 </div>
               </div>
 
-              {/* Row 5 — Received Weight + Final Weight */}
+              {/* Row 5 — Received Grey Weight + Grey Received Date */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Received Weight (by dyer) (kg)</Label>
-                  <Input type="number" step="0.01" className="bg-slate-800/80 border-slate-700/60 text-slate-200"
-                    value={formData.receivedWeight} onChange={(e) => setFormData({ ...formData, receivedWeight: e.target.value })} />
+                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Grey Received Weight (by dyer) (kg)</Label>
+                  <Input type="number" step="0.01" placeholder="Weight dyer confirmed receiving"
+                    className="bg-slate-800/80 border-slate-700/60 text-slate-200"
+                    value={formData.receivedGreyWeight}
+                    onChange={(e) => setFormData({ ...formData, receivedGreyWeight: e.target.value })} />
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Final Fabric Weight (after dyeing) (kg)</Label>
+                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Grey Received Date</Label>
+                  <Input type="date" className="bg-slate-800/80 border-slate-700/60 text-slate-200"
+                    value={formData.greyReceivedDate}
+                    onChange={(e) => setFormData({ ...formData, greyReceivedDate: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Row 6 — Coloured Weight + Sent to Compacter */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Coloured Fabric Weight (after dyeing) (kg)</Label>
                   <Input type="number" step="0.01" className="bg-slate-800/80 border-slate-700/60 text-slate-200"
                     value={formData.finalWeight} onChange={(e) => setFormData({ ...formData, finalWeight: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-slate-400 mb-1.5 block">Sent Weight to Compacter (kg)</Label>
+                  <Input type="number" step="0.01" placeholder="Weight dispatched to compacter"
+                    className="bg-slate-800/80 border-slate-700/60 text-slate-200"
+                    value={formData.sentWeightToCompacter}
+                    onChange={(e) => setFormData({ ...formData, sentWeightToCompacter: e.target.value })} />
                 </div>
               </div>
 

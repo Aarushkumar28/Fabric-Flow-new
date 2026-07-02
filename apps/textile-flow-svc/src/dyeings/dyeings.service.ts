@@ -60,18 +60,29 @@ export class DyeingsService {
     if (dto.initialWeight !== undefined) data.initialWeight = dto.initialWeight;
     if (dto.finalWeight !== undefined) data.finalWeight = dto.finalWeight;
     if (dto.knitterDcNo !== undefined) data.knitterDcNo = dto.knitterDcNo;
-    if (dto.companyDcNo !== undefined) data.companyDcNo = dto.companyDcNo;
     if (dto.compacterId !== undefined)
       data.compacterId = Number(dto.compacterId);
-
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.dateGiven !== undefined) data.dateGiven = new Date(dto.dateGiven);
+    if (dto.fbNo !== undefined) data.fbNo = dto.fbNo;
+
+    // Task 4: new dyeing dispatch fields
+    if (dto.receivedGreyWeight !== undefined)
+      data.receivedGreyWeight = dto.receivedGreyWeight;
+    if (dto.greyReceivedDate !== undefined)
+      data.greyReceivedDate = new Date(dto.greyReceivedDate);
+    if (dto.sentWeightToCompacter !== undefined)
+      data.sentWeightToCompacter = dto.sentWeightToCompacter;
+
+    // Auto-sync companyDcNo to lotNo (one-time fix for existing records, idempotent)
+    if (!existing.companyDcNo) {
+      data.companyDcNo = existing.lotNo;
+    }
 
     // Process loss = absolute weight difference (greyWeight - dyedWeight) in kg
     if (dto.finalWeight !== undefined) {
       const greyWeight = dto.initialWeight ?? existing.initialWeight;
 
-      // Fix #7: Ensure finalWeight <= initialWeight
       if (dto.finalWeight > greyWeight) {
         throw new BadRequestException(
           `Final weight (${dto.finalWeight}) cannot exceed initial weight (${greyWeight})`,
@@ -83,8 +94,7 @@ export class DyeingsService {
 
     const knitterDcNo =
       dto.knitterDcNo !== undefined ? dto.knitterDcNo : existing.knitterDcNo;
-    const companyDcNo =
-      dto.companyDcNo !== undefined ? dto.companyDcNo : existing.companyDcNo;
+    const companyDcNo = existing.companyDcNo ?? existing.lotNo;
 
     // Explicit IN_DYEING transition when both DCs are present
     if (dto.status === undefined) {
@@ -97,7 +107,7 @@ export class DyeingsService {
       }
     }
 
-    // Completion always overrides
+    // Completion always overrides when finalWeight is being set
     if (dto.finalWeight !== undefined) {
       data.status = WorkflowStatus.COMPLETED;
     }
@@ -123,6 +133,7 @@ export class DyeingsService {
         );
       }
 
+      // Post DYED inward inventory when finalWeight is set for the first time
       if (dto.finalWeight !== undefined && existing.finalWeight === null) {
         await this.inventoryService.postInventoryMovement(
           {
@@ -154,6 +165,25 @@ export class DyeingsService {
             tx,
           );
         }
+      }
+
+      // Task 4: post outward DYED inventory when sentWeightToCompacter is set for the first time
+      if (
+        dto.sentWeightToCompacter !== undefined &&
+        existing.sentWeightToCompacter === null
+      ) {
+        await this.inventoryService.postInventoryMovement(
+          {
+            entityType: 'Dyeing',
+            entityId: updated.id,
+            itemType: 'DYED',
+            outwardWeight: dto.sentWeightToCompacter,
+            lotNo: updated.lotNo,
+            stage: 'COMPACTING',
+            remarks: 'Dyed fabric dispatched to compacter',
+          },
+          tx,
+        );
       }
 
       await tx.auditLog.create({

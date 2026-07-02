@@ -283,6 +283,8 @@ model DeliveryNote {
 
 model KnitterProgram {
   id                Int       @id @default(autoincrement())
+  /// Sequential human-readable reference, e.g. KP-0001
+  programNo         String?   @unique @map("program_no")
   knitterId         Int       @map("knitter_id")
   knitter           Knitter   @relation(fields: [knitterId], references: [id])
   
@@ -406,32 +408,39 @@ model MemoLine {
 
 // ====================== Dyeing (Return from Dyer) ======================
 model Dyeing {
-  id                Int       @id @default(autoincrement())
-  lotNo             String    @unique @map("lot_no")
-  hfCode            String?   @map("hf_code")
-  fbNo              String?   @map("fb_no")
+  id                    Int       @id @default(autoincrement())
+  lotNo                 String    @unique @map("lot_no")
+  hfCode                String?   @map("hf_code")
+  fbNo                  String?   @map("fb_no")
   /// which memo line this dyeing belongs to
-  memoLineId        Int       @unique @map("memo_line_id")
-  memoLine          MemoLine  @relation(fields: [memoLineId], references: [id])
-  dyerId            Int       @map("dyer_id")
-  dyer              Dyer      @relation(fields: [dyerId], references: [id])
-  colourId          Int       @map("colour_id")
-  colour            Colour    @relation(fields: [colourId], references: [id])
-  sourceType        String?   @map("source_type")
+  memoLineId            Int       @unique @map("memo_line_id")
+  memoLine              MemoLine  @relation(fields: [memoLineId], references: [id])
+  dyerId                Int       @map("dyer_id")
+  dyer                  Dyer      @relation(fields: [dyerId], references: [id])
+  colourId              Int       @map("colour_id")
+  colour                Colour    @relation(fields: [colourId], references: [id])
+  sourceType            String?   @map("source_type")
   /// sent weight from memo line
-  initialWeight     Float     @map("initial_weight")
-  finalWeight       Float?    @map("final_weight")
-  processLoss       Float?    @map("process_loss")
-  status            String?   @map("status")
-  compactings      Compacting[]
-  noOfRolls         Int?      @map("no_of_rolls")
-  knitterDcNo       String?   @map("knitter_dc_no")
-  companyDcNo       String?   @map("company_dc_no")
-  compacterId       Int?      @map("compacter_id")
-  compacter         Compacter? @relation(fields: [compacterId], references: [id])
-  dateGiven         DateTime? @map("date_given")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  initialWeight         Float     @map("initial_weight")
+  finalWeight           Float?    @map("final_weight")
+  processLoss           Float?    @map("process_loss")
+  status                String?   @map("status")
+  compactings           Compacting[]
+  noOfRolls             Int?      @map("no_of_rolls")
+  knitterDcNo           String?   @map("knitter_dc_no")
+  /// Derived from lotNo — always kept in sync on save; displayed read-only on frontend
+  companyDcNo           String?   @map("company_dc_no")
+  compacterId           Int?      @map("compacter_id")
+  compacter             Compacter? @relation(fields: [compacterId], references: [id])
+  dateGiven             DateTime? @map("date_given")
+  /// Grey fabric weight received by the dyer
+  receivedGreyWeight    Decimal?  @db.Decimal(10, 2) @map("received_grey_weight")
+  /// Date the grey fabric was received by the dyer
+  greyReceivedDate      DateTime? @map("grey_received_date")
+  /// Weight of dyed fabric dispatched onward to the compacter
+  sentWeightToCompacter Decimal?  @db.Decimal(10, 2) @map("sent_weight_to_compacter")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   @@map("dyeings")
 }

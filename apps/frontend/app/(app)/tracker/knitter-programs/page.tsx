@@ -204,7 +204,7 @@ export default function KnitterProgramsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-800 bg-slate-900/80 hover:bg-slate-900/80">
-                  {['Date', 'Knitter', 'Yarn Lots (HF Code)', 'Total Yarn (kg)', 'Grey Wt (kg)', 'Dia', 'Gauge', 'Loop Len', 'Anomaly', 'Actions'].map(h => (
+                  {['Program No', 'Date', 'Knitter', 'Yarn Lots (HF Code)', 'Total Yarn (kg)', 'Grey Wt (kg)', 'Dia', 'Gauge', 'Loop Len', 'Anomaly', 'Actions'].map(h => (
                     <TableHead key={h} className="text-xs font-semibold uppercase tracking-widest text-slate-400">{h}</TableHead>
                   ))}
                 </TableRow>
@@ -230,6 +230,7 @@ export default function KnitterProgramsPage() {
                   
                   return (
                   <TableRow key={p.id} className="border-slate-800/60 hover:bg-slate-800/20 transition-colors">
+                    <TableCell className="font-mono text-sm font-semibold text-indigo-300">{p.programNo ?? `#${p.id}`}</TableCell>
                     <TableCell className="text-slate-300 text-sm">{new Date(p.programDate).toLocaleDateString('en-IN')}</TableCell>
                     <TableCell className="text-slate-200">{p.knitter?.name ?? '–'}</TableCell>
                     <TableCell className="font-mono text-sm font-semibold text-teal-300 max-w-[200px] truncate" title={hfCodes}>
