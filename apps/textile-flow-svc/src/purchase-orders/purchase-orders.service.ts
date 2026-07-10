@@ -390,19 +390,42 @@ export class PurchaseOrdersService {
   async remove(id: string) {
     const po = await this.prisma.purchaseOrder.findUnique({
       where: { id },
-      include: { yarnInwards: true },
+      include: { yarnInwards: true, items: true },
     });
     if (!po) {
       throw new NotFoundException('Purchase Order not found');
     }
-    // Fix #2: Prevent deletion of POs with existing Yarn Inward records
-    if (po.yarnInwards.length > 0) {
+
+    // Block deletion only if any linked Yarn Inward has already been received
+    const receivedInwards = po.yarnInwards.filter(
+      (yi) => yi.status === 'RECEIVED',
+    );
+    if (receivedInwards.length > 0) {
       throw new BadRequestException(
-        'Cannot delete Purchase Order with existing Yarn Inwards',
+        'Cannot delete — yarn has already been received against this PO. Cancel the PO instead.',
       );
     }
-    return this.prisma.purchaseOrder.delete({
-      where: { id },
+
+    return this.prisma.$transaction(async (tx) => {
+      // Delete linked PENDING/CANCELLED YarnInward records
+      if (po.yarnInwards.length > 0) {
+        await tx.yarnInward.deleteMany({
+          where: { purchaseOrderId: id },
+        });
+      }
+
+      // Delete PO items
+      await tx.purchaseOrderItem.deleteMany({
+        where: { purchaseOrderId: id },
+      });
+
+      // Delete the PO itself
+      return tx.purchaseOrder.delete({
+        where: { id },
+      });
+    }).then((deleted) => {
+      this.logPO('PO Deleted', deleted.poNumber, po.supplierName, po.poType);
+      return deleted;
     });
   }
 }
