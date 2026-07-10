@@ -11,7 +11,9 @@ export class CompactersService {
   }
 
   create(dto: CreateCompacterDto) {
-    return this.prisma.compacter.create({ data: dto });
+    return this.prisma.compacter.create({
+      data: { ...dto, gstin: dto.gstin?.trim() || null },
+    });
   }
 
   findOne(id: number) {

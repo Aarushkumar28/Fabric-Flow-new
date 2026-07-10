@@ -62,5 +62,18 @@ export function useMasterData(entity: string) {
       toast.error(extractErrorMessage(err, `Failed to delete ${entity.slice(0, -1)}`)),
   });
 
-  return { data, isLoading, isError, error, createMutation, updateMutation, deleteMutation };
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const items = data as Array<{ id: string | number }>;
+      await Promise.all(items.map((item) => api.delete(`/${entity}/${String(item.id)}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      toast.success(`All ${entity} deleted`);
+    },
+    onError: (err: unknown) =>
+      toast.error(extractErrorMessage(err, `Failed to delete all ${entity}`)),
+  });
+
+  return { data, isLoading, isError, error, createMutation, updateMutation, deleteMutation, deleteAllMutation };
 }

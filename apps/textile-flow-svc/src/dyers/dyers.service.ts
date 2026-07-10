@@ -11,7 +11,9 @@ export class DyersService {
   }
 
   create(dto: CreateDyerDto) {
-    return this.prisma.dyer.create({ data: dto });
+    return this.prisma.dyer.create({
+      data: { ...dto, gstin: dto.gstin?.trim() || null },
+    });
   }
 
   findOne(id: number) {

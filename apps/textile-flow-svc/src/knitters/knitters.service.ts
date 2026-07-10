@@ -11,7 +11,9 @@ export class KnittersService {
   }
 
   create(dto: CreateKnitterDto) {
-    return this.prisma.knitter.create({ data: dto });
+    return this.prisma.knitter.create({
+      data: { ...dto, gstin: dto.gstin?.trim() || null },
+    });
   }
 
   findOne(id: number) {

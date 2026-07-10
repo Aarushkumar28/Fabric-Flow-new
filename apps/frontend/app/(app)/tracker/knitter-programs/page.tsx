@@ -138,6 +138,24 @@ export default function KnitterProgramsPage() {
     if (window.confirm('Delete this knitter program?')) deleteMutation.mutate(id);
   };
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(programs.map((p) => api.delete(`/knitter-programs/${p.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knitter-programs'] });
+      toast.success('All programs deleted!');
+    },
+    onError: () => toast.error('Failed to delete some programs'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (programs.length === 0) return;
+    if (window.confirm(`Delete ALL ${programs.length} knitter programs? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   // Live Lycra calculation
   const yarnUsedVal = parseFloat(formData.quantityUsed) || 0;
   const lycraPercentVal = parseFloat(formData.lycraPercent) || 0;
@@ -182,12 +200,21 @@ export default function KnitterProgramsPage() {
               {isLoading ? 'Loading…' : `${programs.length} program${programs.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button
-            onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-teal-500/20 transition-all duration-200"
-          >
-            <PlusCircle className="h-4 w-4" /> Record Production
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending || programs.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete All
+            </button>
+            <button
+              onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-teal-500/20 transition-all duration-200"
+            >
+              <PlusCircle className="h-4 w-4" /> Record Production
+            </button>
+          </div>
         </div>
 
         {/* Table */}

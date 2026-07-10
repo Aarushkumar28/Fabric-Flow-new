@@ -7,7 +7,12 @@ export class MillsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMillDto) {
-    return this.prisma.mill.create({ data: dto });
+    const data = {
+      ...dto,
+      // Convert empty GSTIN to null to avoid unique constraint violations
+      gstin: dto.gstin?.trim() || null,
+    };
+    return this.prisma.mill.create({ data });
   }
 
   async findAll() {

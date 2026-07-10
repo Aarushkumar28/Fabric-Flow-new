@@ -167,6 +167,24 @@ export default function FabricInventoryPage() {
     if (window.confirm('Delete this fabric record?')) deleteMutation.mutate(id);
   };
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(records.map((r) => api.delete(`/grey-fabric-inward/${r.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['grey-fabric-inward'] });
+      toast.success('All fabric records deleted!');
+    },
+    onError: () => toast.error('Failed to delete some records'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (records.length === 0) return;
+    if (window.confirm(`Delete ALL ${records.length} fabric inward records? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const payload: Record<string, unknown> = {
@@ -216,14 +234,23 @@ export default function FabricInventoryPage() {
               Grey &amp; Coloured fabric stock across all knitters
             </p>
           </div>
-          {activeTab === 'grey' && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => { setEditRecord(null); setForm(EMPTY_FORM); setCreateOpen(true); }}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition-all duration-200"
+              onClick={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending || records.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
             >
-              <PlusCircle className="h-4 w-4" /> Add Fabric Inward
+              <Trash2 className="h-3.5 w-3.5" /> Delete All
             </button>
-          )}
+            {activeTab === 'grey' && (
+              <button
+                onClick={() => { setEditRecord(null); setForm(EMPTY_FORM); setCreateOpen(true); }}
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition-all duration-200"
+              >
+                <PlusCircle className="h-4 w-4" /> Add Fabric Inward
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}

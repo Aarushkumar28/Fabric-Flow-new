@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, RefreshCw, AlertTriangle } from "lucide-react";
+import { Search, RefreshCw, AlertTriangle, Trash2 } from "lucide-react";
 import MasterDataFormDialog, { type FormField } from "./MasterDataFormDialog";
 import MasterDataTable from "./MasterDataTable";
 import { useMasterData } from "@/hooks/useMasterData";
@@ -28,7 +28,7 @@ export default function MasterDataEntityPage({
   fields,
 }: MasterDataEntityPageProps) {
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, createMutation, updateMutation, deleteMutation } =
+  const { data, isLoading, isError, createMutation, updateMutation, deleteMutation, deleteAllMutation } =
     useMasterData(entity);
 
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null);
@@ -71,6 +71,19 @@ export default function MasterDataEntityPage({
             isPending={createMutation.isPending}
             onSubmit={(values) => createMutation.mutate(values)}
           />
+          <button
+            type="button"
+            onClick={() => {
+              if ((data as unknown[]).length === 0) return;
+              if (window.confirm(`Delete ALL ${(data as unknown[]).length} ${title.toLowerCase()}? This cannot be undone.`)) {
+                deleteAllMutation.mutate();
+              }
+            }}
+            disabled={deleteAllMutation.isPending || (data as unknown[]).length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete All
+          </button>
         </div>
 
         {/* Search + refresh bar */}

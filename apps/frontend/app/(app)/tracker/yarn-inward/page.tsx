@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Pencil, Trash2, FileText, Package } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, FileText, Package, ChevronDown } from 'lucide-react';
 import type { YarnInward, YarnInwardFormData, Knitter } from '@/types/entities';
 import type { Mill } from '@/types/yarn';
 import YarnPOPreviewModal from '@/components/po/YarnPOPreviewModal';
@@ -57,6 +57,7 @@ export default function YarnInwardPage() {
   const [poData, setPoData] = useState<YarnPOData | null>(null);
   const [poPreviewOpen, setPoPreviewOpen] = useState(false);
   const [formData, setFormData] = useState<YarnInwardFormData>(EMPTY_FORM);
+  const [yiStatusFilter, setYiStatusFilter] = useState<'ACTIVE' | 'CANCELLED' | 'ALL'>('ACTIVE');
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: records = [], isLoading } = useQuery<YarnInward[]>({
@@ -142,6 +143,31 @@ export default function YarnInwardPage() {
     if (window.confirm('Delete this yarn inward record?')) deleteMutation.mutate(id);
   };
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(records.map((r) => api.delete(`/yarn-inward/${r.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yarn-inward'] });
+      toast.success('All yarn inward records deleted!');
+    },
+    onError: () => toast.error('Failed to delete some records'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (records.length === 0) return;
+    if (window.confirm(`Delete ALL ${records.length} yarn inward records? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
+  // Filter records by status
+  const filteredRecords = records.filter((r) => {
+    if (yiStatusFilter === 'ALL') return true;
+    if (yiStatusFilter === 'CANCELLED') return r.status === 'CANCELLED';
+    return r.status !== 'CANCELLED';
+  });
+
   const handleGeneratePO = async (id: number) => {
     try {
       const { data } = await api.get<YarnPOData>(`/yarn-inward/${id}`);
@@ -217,12 +243,33 @@ export default function YarnInwardPage() {
               {isLoading ? 'Loading…' : `${records.length} inward record${records.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button
-            onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all duration-200"
-          >
-            <PlusCircle className="h-4 w-4" /> Add Manual Inward
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <select
+                value={yiStatusFilter}
+                onChange={(e) => setYiStatusFilter(e.target.value as 'ACTIVE' | 'CANCELLED' | 'ALL')}
+                className="rounded-lg border border-slate-700/60 bg-slate-800/80 px-3 py-1.5 pr-8 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 appearance-none"
+              >
+                <option value="ACTIVE">Active / Pending</option>
+                <option value="CANCELLED">Cancelled Only</option>
+                <option value="ALL">All Statuses</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500 pointer-events-none" />
+            </div>
+            <button
+              onClick={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending || records.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete All
+            </button>
+            <button
+              onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all duration-200"
+            >
+              <PlusCircle className="h-4 w-4" /> Add Manual Inward
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -245,13 +292,13 @@ export default function YarnInwardPage() {
                       ))}
                     </TableRow>
                   ))
-                ) : records.length === 0 ? (
+                ) : filteredRecords.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={TABLE_HEADERS.length} className="py-12 text-center text-sm text-slate-500">
-                      No inward records yet. Create a Yarn PO or click &quot;Add Manual Inward&quot; to create one.
+                      {records.length === 0 ? 'No inward records yet. Create a Yarn PO or click "Add Manual Inward" to create one.' : `No ${yiStatusFilter.toLowerCase()} inward records.`}
                     </TableCell>
                   </TableRow>
-                ) : records.map((r) => {
+                ) : filteredRecords.map((r) => {
                   const isPending = r.status === 'PENDING';
                   // Get details from PO items if inward doesn't override it natively
                   const poItem = r.purchaseOrder?.items?.[0];

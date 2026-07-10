@@ -263,6 +263,25 @@ export default function MemosPage() {
   const removeLine = (i: number) => setFormData({ ...formData, lines: formData.lines.filter((_, idx) => idx !== i) });
   const confirmDelete = (id: number) => { if (window.confirm('Delete this memo and its dyeing records?')) deleteMutation.mutate(id); };
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(memos.map((m) => api.delete(`/memos/${m.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['memos'] });
+      queryClient.invalidateQueries({ queryKey: ['dyeings'] });
+      toast.success('All memos deleted!');
+    },
+    onError: () => toast.error('Failed to delete some memos'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (memos.length === 0) return;
+    if (window.confirm(`Delete ALL ${memos.length} memos? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const lines = formData.lines.map(l => {
@@ -344,12 +363,21 @@ export default function MemosPage() {
               {isLoading ? 'Loading…' : `${memos.length} memo${memos.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200"
-          >
-            <PlusCircle className="h-4 w-4" /> New Memo
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending || memos.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete All
+            </button>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200"
+            >
+              <PlusCircle className="h-4 w-4" /> New Memo
+            </button>
+          </div>
         </div>
 
         {/* Table */}

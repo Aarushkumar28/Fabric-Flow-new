@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Package2, Search, Pencil, Trash2, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { YarnLotForm } from '@/components/yarn/YarnLotForm';
 import type { YarnLot, YarnLotFormData, Mill, Knitter } from '@/types/yarn';
 import { ProtectedRoute } from '@/components/auth/protected-route';
@@ -72,6 +73,24 @@ export default function YarnPage() {
     if (window.confirm('Delete this yarn lot?')) deleteMutation.mutate(id);
   };
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(lots.map((lot) => api.delete(`/yarn-lots/${lot.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yarn-lots'] });
+      toast.success('All yarn lots deleted!');
+    },
+    onError: () => toast.error('Failed to delete some yarn lots'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (lots.length === 0) return;
+    if (window.confirm(`Delete ALL ${lots.length} yarn lots? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -85,9 +104,15 @@ export default function YarnPage() {
               {isLoading ? 'Loading…' : `${lots.length} lot${lots.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          {/* Add Yarn Lot button removed — yarn lots are created automatically
-              via the PO → Yarn Inward → RECEIVED transition to ensure
-              every lot is traceable to a Purchase Order. */}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
+            onClick={confirmDeleteAll}
+            disabled={deleteAllMutation.isPending || lots.length === 0}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete All
+          </Button>
         </div>
 
         {/* Search & Filter Bar */}

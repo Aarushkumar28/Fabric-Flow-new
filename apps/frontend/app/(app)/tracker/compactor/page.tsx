@@ -138,6 +138,24 @@ export default function CompactorPage() {
     onError: () => toast.error('Failed to delete compacting record'),
   });
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(records.map((r) => api.delete(`/compactings/${r.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['compactings'] });
+      toast.success('All compacting records deleted!');
+    },
+    onError: () => toast.error('Failed to delete some records'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (records.length === 0) return;
+    if (window.confirm(`Delete ALL ${records.length} compacting records? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   const closeDialogs = () => {
     setCreateOpen(false);
     setEditRecord(null);
@@ -206,12 +224,21 @@ export default function CompactorPage() {
               {isLoading ? 'Loading…' : `${records.length} record${records.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button
-            onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all duration-200"
-          >
-            <PlusCircle className="h-4 w-4" /> Add Compacting
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending || records.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete All
+            </button>
+            <button
+              onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all duration-200"
+            >
+              <PlusCircle className="h-4 w-4" /> Add Compacting
+            </button>
+          </div>
         </div>
 
         {/* Table */}

@@ -114,6 +114,25 @@ export default function DeliveryNotesPage() {
     if (window.confirm('Delete this delivery note?')) deleteMutation.mutate(id);
   };
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(deliveryNotes.map((dn) => api.delete(`/delivery-notes/${dn.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['knitter-stock'] });
+      toast.success('All delivery notes deleted!');
+    },
+    onError: () => toast.error('Failed to delete some delivery notes'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (deliveryNotes.length === 0) return;
+    if (window.confirm(`Delete ALL ${deliveryNotes.length} delivery notes? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.sourceKnitterId === formData.destinationKnitterId) {
@@ -148,12 +167,21 @@ export default function DeliveryNotesPage() {
               {isLoading ? 'Loading…' : `${deliveryNotes.length} transfer${deliveryNotes.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          <button
-            onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all duration-200"
-          >
-            <PlusCircle className="h-4 w-4" /> New Transfer
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={confirmDeleteAll}
+              disabled={deleteAllMutation.isPending || deliveryNotes.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete All
+            </button>
+            <button
+              onClick={() => { setEditRecord(null); setFormData(EMPTY_FORM); setCreateOpen(true); }}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all duration-200"
+            >
+              <PlusCircle className="h-4 w-4" /> New Transfer
+            </button>
+          </div>
         </div>
 
         {/* Table */}

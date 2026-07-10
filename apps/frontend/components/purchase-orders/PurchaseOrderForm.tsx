@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Printer, FileText, Download, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Printer, FileText, Download, Trash2, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -107,6 +107,7 @@ export default function PurchaseOrderForm() {
   // Track exact IDs from dropdown selection for reliable inward auto-linking
   const [selectedMillId, setSelectedMillId] = useState<number | null>(null);
   const [selectedKnitterId, setSelectedKnitterId] = useState<number | null>(null);
+  const [poStatusFilter, setPoStatusFilter] = useState<'ACTIVE' | 'CANCELLED' | 'ALL'>('ACTIVE');
 
   const form = useForm<POFormData>({
     defaultValues: EMPTY_FORM,
@@ -335,6 +336,32 @@ export default function PurchaseOrderForm() {
       cancelMutation.mutate(String(po.id));
     }
   };
+
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const ids = purchaseOrders.map((po) => String(po.id));
+      await Promise.all(ids.map((id) => api.delete(`/purchase-orders/${id}`)));
+    },
+    onSuccess: () => {
+      toast.success('All Purchase Orders deleted!');
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    },
+    onError: () => toast.error('Failed to delete some Purchase Orders'),
+  });
+
+  const confirmDeleteAll = () => {
+    if (purchaseOrders.length === 0) return;
+    if (window.confirm(`Delete ALL ${purchaseOrders.length} purchase orders? This cannot be undone.`)) {
+      deleteAllMutation.mutate();
+    }
+  };
+
+  // Filter POs by status for display
+  const filteredPOs = purchaseOrders.filter((po) => {
+    if (poStatusFilter === 'ALL') return true;
+    if (poStatusFilter === 'CANCELLED') return po.status === 'CANCELLED';
+    return po.status !== 'CANCELLED';
+  });
 
   // Grand totals computed for display
   const grandTotal = watchedItems.reduce((acc, item) => {
@@ -881,20 +908,42 @@ export default function PurchaseOrderForm() {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
       {/* HISTORICAL PURCHASE ORDERS LIST */}
       <Card className="bg-slate-900 border-slate-800 text-white shadow-xl mt-6">
-        <CardHeader className="border-b border-slate-800 pb-4">
-          <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-200">
-            <Download className="text-primary w-5 h-5" /> Previously Generated Purchase Orders
-          </CardTitle>
+        <CardHeader className="border-b border-slate-800">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-200">
+              <Download className="text-primary w-5 h-5" /> Previously Generated Purchase Orders
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <select
+                  value={poStatusFilter}
+                  onChange={(e) => setPoStatusFilter(e.target.value as 'ACTIVE' | 'CANCELLED' | 'ALL')}
+                  className="rounded-lg border border-slate-700/60 bg-slate-800/80 px-3 py-1.5 pr-8 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 appearance-none"
+                >
+                  <option value="ACTIVE">Active Only</option>
+                  <option value="CANCELLED">Cancelled Only</option>
+                  <option value="ALL">All Statuses</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500 pointer-events-none" />
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
+                onClick={confirmDeleteAll}
+                disabled={deleteAllMutation.isPending || purchaseOrders.length === 0}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete All
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
-          {purchaseOrders.length === 0 ? (
+          {filteredPOs.length === 0 ? (
             <div className="text-center py-6 text-slate-400 text-sm italic border border-dashed border-slate-800 rounded">
-              No historical purchase orders found in the database.
+              {purchaseOrders.length === 0 ? 'No historical purchase orders found in the database.' : `No ${poStatusFilter.toLowerCase()} purchase orders.`}
             </div>
           ) : (
             <div className="overflow-x-auto rounded border border-slate-800">
@@ -912,7 +961,7 @@ export default function PurchaseOrderForm() {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-800">
-                  {purchaseOrders.map((po) => (
+                  {filteredPOs.map((po) => (
                     <TableRow key={po.id} className={`hover:bg-slate-800/20 border-slate-800 text-white ${po.status === 'CANCELLED' ? 'opacity-50' : ''}`}>
                       <TableCell className="font-semibold">{po.poNumber}</TableCell>
                       <TableCell>{po.poType === 'GREY_FABRIC' ? po.fbNo || '—' : po.hfCode}</TableCell>

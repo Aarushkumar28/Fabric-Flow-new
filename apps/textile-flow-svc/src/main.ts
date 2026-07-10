@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -13,10 +14,14 @@ async function bootstrap() {
     }),
   );
 
+  app.useGlobalFilters(new PrismaExceptionFilter());
+
 app.enableCors({
   origin: [
     'http://localhost:3000',
+    'http://localhost:3001',
     'https://fabric-flow-frontend-1uju.onrender.com',
+    'https://fabric-flow-frontend-flqq.onrender.com',
     process.env.FRONTEND_URL ?? '',
   ].filter(Boolean),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
