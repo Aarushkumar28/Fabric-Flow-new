@@ -7,7 +7,7 @@ export class CompactersService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
-    return this.prisma.compacter.findMany();
+    return this.prisma.compacter.findMany({ orderBy: { name: 'asc' } });
   }
 
   create(dto: CreateCompacterDto) {
@@ -21,10 +21,29 @@ export class CompactersService {
   }
 
   update(id: number, dto: UpdateCompacterDto) {
-    return this.prisma.compacter.update({ where: { id }, data: dto });
+    return this.prisma.compacter.update({
+      where: { id },
+      data: {
+        ...dto,
+        gstin:
+          dto.gstin !== undefined ? dto.gstin?.trim() || null : undefined,
+      },
+    });
   }
 
-  remove(id: number) {
-    return this.prisma.compacter.delete({ where: { id } });
+  async remove(id: number) {
+    return this.prisma.$transaction(async (tx) => {
+      // Delete compactings referencing this compacter
+      await tx.compacting.deleteMany({ where: { compacterId: id } });
+
+      // Delete dyeings assigned to this compacter
+      await tx.dyeing.updateMany({
+        where: { compacterId: id },
+        data: { compacterId: null },
+      });
+
+      // Finally delete the compacter
+      return tx.compacter.delete({ where: { id } });
+    });
   }
 }
