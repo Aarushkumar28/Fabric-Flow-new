@@ -908,6 +908,9 @@ export default function PurchaseOrderForm() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
       {/* HISTORICAL PURCHASE ORDERS LIST */}
       <Card className="bg-slate-900 border-slate-800 text-white shadow-xl mt-6">
         <CardHeader className="border-b border-slate-800">
