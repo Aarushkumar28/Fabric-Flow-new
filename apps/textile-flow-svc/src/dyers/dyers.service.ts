@@ -67,7 +67,7 @@ export class DyersService {
 
       // Delete knitting lots referencing this dyer
       const knittingLots = await tx.knittingLot.findMany({
-        where: { dyerId: id },
+        where: { dyerNameId: id },
         select: { id: true },
       });
       if (knittingLots.length > 0) {
