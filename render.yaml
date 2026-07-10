@@ -22,7 +22,72 @@ services:
     env: static
     buildCommand: npm install && npx turbo run build --filter=@textile-flow/frontend
     staticPublishPath: apps/frontend/out
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
     routes:
+      - type: rewrite
+        source: /
+        destination: /index.html
+      - type: rewrite
+        source: /login
+        destination: /login.html
+      - type: rewrite
+        source: /tracker/master-data/mills
+        destination: /tracker/master-data/mills.html
+      - type: rewrite
+        source: /tracker/master-data/knitters
+        destination: /tracker/master-data/knitters.html
+      - type: rewrite
+        source: /tracker/master-data/dyers
+        destination: /tracker/master-data/dyers.html
+      - type: rewrite
+        source: /tracker/master-data/compacters
+        destination: /tracker/master-data/compacters.html
+      - type: rewrite
+        source: /tracker/master-data/colours
+        destination: /tracker/master-data/colours.html
+      - type: rewrite
+        source: /tracker/yarn-inward
+        destination: /tracker/yarn-inward.html
+      - type: rewrite
+        source: /tracker/yarn
+        destination: /tracker/yarn.html
+      - type: rewrite
+        source: /tracker/grey-fabric-inward
+        destination: /tracker/grey-fabric-inward.html
+      - type: rewrite
+        source: /tracker/purchase-orders
+        destination: /tracker/purchase-orders.html
+      - type: rewrite
+        source: /tracker/knitter-programs
+        destination: /tracker/knitter-programs.html
+      - type: rewrite
+        source: /tracker/dyeing
+        destination: /tracker/dyeing.html
+      - type: rewrite
+        source: /tracker/memos
+        destination: /tracker/memos.html
+      - type: rewrite
+        source: /tracker/delivery-notes
+        destination: /tracker/delivery-notes.html
+      - type: rewrite
+        source: /tracker/compactor
+        destination: /tracker/compactor.html
+      - type: rewrite
+        source: /production-planning
+        destination: /production-planning.html
+      - type: rewrite
+        source: /production-planning/dashboard
+        destination: /production-planning/dashboard.html
+      - type: rewrite
+        source: /production-planning/events
+        destination: /production-planning/events.html
+      - type: rewrite
+        source: /analytics
+        destination: /analytics.html
+      # Fallback: serve index.html for any unmatched route (client-side routing handles it)
       - type: rewrite
         source: /*
         destination: /index.html
@@ -33,3 +98,4 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         sync: false
+
