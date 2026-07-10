@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: textile-flow-svc
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install && npx prisma generate --schema=apps/textile-flow-svc/prisma/schema.prisma && npx turbo run build --filter=textile-flow-svc
+    startCommand: node apps/textile-flow-svc/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+
+  - type: web
+    name: fabric-flow-frontend
+    env: static
+    buildCommand: npm install && npx turbo run build --filter=@textile-flow/frontend
+    staticPublishPath: apps/frontend/out
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false

@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@textile-flow/shared": [
+        "./packages/shared/src"
+      ]
+    }
+  }
+}

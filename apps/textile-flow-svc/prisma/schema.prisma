@@ -1,0 +1,811 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+enum POStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+enum YarnInwardStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+model Mill {
+  id           Int          @id @default(autoincrement())
+  name         String
+  addressLine1 String?      @map("address_line1")
+  addressLine2 String?      @map("address_line2")
+  city         String?
+  state        String?
+  pincode      String?
+  email        String?
+  phone        String?
+  gstin        String?      @unique
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  YarnLot      YarnLot[]
+  yarnInwards  YarnInward[]
+
+  @@map("mills")
+}
+
+model Knitter {
+  id                 Int              @id @default(autoincrement())
+  name               String
+  addressLine1       String?          @map("address_line1")
+  addressLine2       String?          @map("address_line2")
+  city               String?
+  state              String?
+  pincode            String?
+  email              String?
+  phone              String?
+  gstin              String?          @unique
+  isActive           Boolean          @default(true) @map("is_active")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  DeliveryNoteSource DeliveryNote[]   @relation("SourceKnitter")
+  DeliveryNoteDest   DeliveryNote[]   @relation("DestKnitter")
+  KnitterProgram     KnitterProgram[]
+  KnitterStock       KnitterStock[]
+  yarnInwards        YarnInward[]
+  greyFabricLots     GreyFabricLot[]
+  knittings          Knitting[]
+
+  @@map("knitters")
+}
+
+model Dyer {
+  id            Int             @id @default(autoincrement())
+  name          String
+  addressLine1  String?         @map("address_line1")
+  addressLine2  String?         @map("address_line2")
+  city          String?
+  state         String?
+  pincode       String?
+  email         String?
+  phone         String?
+  gstin         String?         @unique
+  isActive      Boolean         @default(true) @map("is_active")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  DyeingProgram     DyeingProgram[]
+  knitterPrograms   KnitterProgram[]
+  memos             Memo[]
+  dyeings           Dyeing[]
+  knittingLots      KnittingLot[]
+
+  @@map("dyers")
+}
+
+model Compacter {
+  id           Int      @id @default(autoincrement())
+  name         String
+  addressLine1 String?  @map("address_line1")
+  addressLine2 String?  @map("address_line2")
+  city         String?
+  state        String?
+  pincode      String?
+  email        String?
+  phone        String?
+  gstin        String?  @unique
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  dyeings      Dyeing[]
+  compactings  Compacting[]
+
+  @@map("compacters")
+}
+
+model Colour {
+  id             Int              @id @default(autoincrement())
+  name           String
+  code           String           @unique
+  hexCode        String?          @map("hex_code")
+  description    String?
+  isActive       Boolean          @default(true) @map("is_active")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  DyeingProgram  DyeingProgram[]
+  YarnLot        YarnLot[]
+  dyeings        Dyeing[]
+  knittingLotEntries KnittingLotEntry[]
+  compactings    Compacting[]
+
+  @@map("colours")
+}
+
+
+
+model YarnLot {
+  id              Int      @id @default(autoincrement())
+  hfCode          String   @map("hf_code")
+  purchaseOrderNo String?  @map("purchase_order_no")
+  invoiceNo       String?  @map("invoice_no")
+  deliveryTo      String?  @map("delivery_to")
+  description     String?
+  millId          Int      @map("mill_id")
+  count           String?
+  quality         String?
+  status          String?  @default("ACTIVE")
+  ratePerKg       Float    @map("rate_per_kg")
+  totalWeight     Float    @map("total_weight")
+  totalCost       Float    @map("total_cost")
+  availableWeight Float    @map("available_weight")
+  noOfBags        Int?     @map("no_of_bags")
+  bagWeight       Float?   @map("bag_weight")
+  cgstRate        Float?   @map("cgst_rate")
+  sgstRate        Float?   @map("sgst_rate")
+  cgstAmount      Float?   @map("cgst_amount")
+  sgstAmount      Float?   @map("sgst_amount")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  colourId        Int?     @map("colour_id")
+
+  knitterStocks  KnitterStock[]
+  yarnReceipts   YarnReceipt[]
+  knittingYarnUsages KnittingYarnUsage[]
+  colour        Colour?        @relation(fields: [colourId], references: [id])
+  mill          Mill           @relation(fields: [millId], references: [id])
+  yarnInwardId  Int?           @map("yarn_inward_id")
+  yarnInward    YarnInward?    @relation(fields: [yarnInwardId], references: [id])
+  deliveryNotes   DeliveryNote[]
+  knitterPrograms KnitterProgram[]
+  knitterProgramYarnUsages KnitterProgramYarnUsage[]
+
+  @@map("yarn_lots")
+}
+
+model YarnReceipt {
+  id          Int      @id @default(autoincrement())
+  yarnLotId   Int      @map("yarn_lot_id")
+  yarnLot     YarnLot  @relation(fields: [yarnLotId], references: [id])
+  quantity    Float
+  receiptDate DateTime @map("receipt_date")
+  dcNo        String?  @map("dc_no")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("yarn_receipts")
+}
+
+model KnitterStock {
+  id              Int      @id @default(autoincrement())
+  knitterId       Int      @map("knitter_id")
+  yarnLotId       Int      @map("yarn_lot_id")
+  receivedWeight  Float    @map("received_weight")
+  remainingWeight Float    @map("remaining_weight")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  knitter         Knitter  @relation(fields: [knitterId], references: [id])
+  yarnLot         YarnLot  @relation(fields: [yarnLotId], references: [id])
+
+  @@unique([knitterId, yarnLotId])
+  @@map("knitter_stocks")
+}
+
+model Knitting {
+  id                  Int                   @id @default(autoincrement())
+  dcNo                String
+  knitterNameId       Int                   @map("knitter_name_id")
+  knitter             Knitter               @relation(fields: [knitterNameId], references: [id])
+  totalYarnQty        Float                 @map("total_yarn_qty")
+  loopLength          String?               @map("loop_length")
+  dia                 String?
+  count               String?
+  gauge               String?
+  fabricDescriptionId Int                   @map("fabric_description_id")
+  greyFabricWeight    Float                 @map("grey_fabric_weight")
+  receivedWeight      Float?                @map("received_weight")
+  shortage            Float?                @map("shortage")
+  status              String?               @map("status")
+  noOfRolls           Int                   @map("no_of_rolls")
+  dateGiven           DateTime              @map("date_given")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  knittingYarnUsages  KnittingYarnUsage[]
+  knittingLots        KnittingLot[]
+  dyeingOrderLines    DyeingOrderLine[]
+
+  @@map("knittings")
+}
+
+model KnittingYarnUsage {
+  id         Int      @id @default(autoincrement())
+  knittingId Int      @map("knitting_id")
+  knitting   Knitting @relation(fields: [knittingId], references: [id])
+  yarnLotId  Int      @map("yarn_lot_id")
+  yarnLot    YarnLot  @relation(fields: [yarnLotId], references: [id])
+  hfCode     String   @map("hf_code")
+  quantity   Float
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("knitting_yarn_usages")
+}
+
+model KnittingLot {
+  id          Int                @id @default(autoincrement())
+  lotNo       String             @unique @map("lot_no")
+  knittingId  Int                @map("knitting_id")
+  knitting    Knitting           @relation(fields: [knittingId], references: [id])
+  dyerNameId  Int?               @map("dyer_name_id")
+  dyer        Dyer?              @relation(fields: [dyerNameId], references: [id])
+  noOfRolls   Int?               @map("no_of_rolls")
+  jobWorkNo   String?            @map("job_work_no")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  entries     KnittingLotEntry[]
+  memoLines   MemoLine[]
+
+  @@map("knitting_lots")
+}
+
+model KnittingLotEntry {
+  id            Int         @id @default(autoincrement())
+  knittingLotId Int         @map("knitting_lot_id")
+  knittingLot   KnittingLot @relation(fields: [knittingLotId], references: [id])
+  colourId      Int         @map("colour_id")
+  colour        Colour      @relation(fields: [colourId], references: [id])
+  weight        Float
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@map("knitting_lot_entries")
+}
+
+model DeliveryNote {
+  id                   Int      @id @default(autoincrement())
+  sourceKnitterId      Int      @map("source_knitter_id")
+  sourceKnitter        Knitter  @relation("SourceKnitter", fields: [sourceKnitterId], references: [id])
+  destinationKnitterId Int      @map("destination_knitter_id")
+  destinationKnitter   Knitter  @relation("DestKnitter", fields: [destinationKnitterId], references: [id])
+  yarnLotId            Int      @map("yarn_lot_id")
+  yarnLot              YarnLot  @relation(fields: [yarnLotId], references: [id])
+  quantity             Decimal  @db.Decimal(10, 2)
+  dcNumber             String?  @map("dc_number")
+  note                 String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@map("delivery_notes")
+}
+
+model KnitterProgram {
+  id                Int       @id @default(autoincrement())
+  /// Sequential human-readable reference, e.g. KP-0001
+  programNo         String?   @unique @map("program_no")
+  knitterId         Int       @map("knitter_id")
+  knitter           Knitter   @relation(fields: [knitterId], references: [id])
+  
+  // These fields are deprecated in favor of yarnUsages, but kept for non-destructive migration
+  yarnLotId         Int?      @map("yarn_lot_id")
+  yarnLot           YarnLot?  @relation(fields: [yarnLotId], references: [id])
+  /// kg of yarn consumed (deprecated)
+  quantityUsed      Decimal?  @db.Decimal(10, 2) @map("quantity_used")
+  
+  /// actual scale weight of grey fabric produced
+  greyWeight        Decimal   @db.Decimal(10, 2) @map("grey_weight")
+  numRolls          Int?      @map("num_rolls")
+  dia               String?
+  gg                String?
+  loopLength        String?   @map("loop_length")
+  fabricName        String?   @map("fabric_name")
+  fabricColour      String?   @map("fabric_colour")
+  programmeRef      String?   @map("programme_ref")
+  preAssignedDyerId Int?      @map("pre_assigned_dyer_id")
+  preAssignedDyer   Dyer?     @relation(fields: [preAssignedDyerId], references: [id])
+  /// e.g. "Lycra", "Spandex", or null for no blend
+  blendType         String?   @map("blend_type")
+  /// percentage of blend material (e.g. 2.5, 5.0)
+  blendPercent      Decimal?  @db.Decimal(5, 2) @map("blend_percent")
+  /// true if greyWeight > quantityUsed
+  anomalyFlag       Boolean   @default(false)    @map("anomaly_flag")
+  programDate       DateTime  @default(now())    @map("program_date")
+  createdAt         DateTime  @default(now())    @map("created_at")
+  updatedAt         DateTime  @updatedAt         @map("updated_at")
+
+  greyFabricLots    GreyFabricLot[]
+  yarnUsages        KnitterProgramYarnUsage[]
+
+  @@map("knitter_programs")
+}
+
+model KnitterProgramYarnUsage {
+  id               Int            @id @default(autoincrement())
+  knitterProgramId Int            @map("knitter_program_id")
+  knitterProgram   KnitterProgram @relation(fields: [knitterProgramId], references: [id], onDelete: Cascade)
+  yarnLotId        Int            @map("yarn_lot_id")
+  yarnLot          YarnLot        @relation(fields: [yarnLotId], references: [id])
+  quantityUsed     Decimal        @db.Decimal(10, 2) @map("quantity_used")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@map("knitter_program_yarn_usages")
+}
+
+enum GreyFabricLotSource {
+  KNITTED
+  PURCHASED
+}
+
+enum GreyFabricLotStatus {
+  AVAILABLE
+  DISPATCHED
+  CONSUMED
+  DELETED
+}
+
+model GreyFabricLot {
+  id                 Int                  @id @default(autoincrement())
+  lotNumber          String               @unique @map("lot_number")
+  fbNo               String?              @map("fb_no")
+  knitterProgramId   Int?                 @map("knitter_program_id")
+  knitterProgram     KnitterProgram?      @relation(fields: [knitterProgramId], references: [id])
+  knitterId          Int?                 @map("knitter_id")
+  knitter            Knitter?             @relation(fields: [knitterId], references: [id])
+  greyWeight         Decimal              @db.Decimal(10, 2) @map("grey_weight")
+  rollCount          Int?                 @map("roll_count")
+  source             GreyFabricLotSource  @default(KNITTED)
+  status             String               @default("AVAILABLE")
+  greyFabricInwardId Int?                 @map("grey_fabric_inward_id")
+  greyFabricInward   GreyFabricInward?    @relation(fields: [greyFabricInwardId], references: [id])
+  memoLines          MemoLine[]
+  DyeingProgram      DyeingProgram[]
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  @@map("grey_fabric_lots")
+}
+
+// ====================== Dyeing Dispatch (Memo) ======================
+model Memo {
+  id          Int        @id @default(autoincrement())
+  /// sequential, e.g. 40, 41…
+  memoNo      Int        @unique @map("memo_no")
+  issueDate   DateTime   @default(now()) @map("issue_date")
+  dyerId      Int        @map("dyer_id")
+  dyer        Dyer       @relation(fields: [dyerId], references: [id])
+  remarks     String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  lines       MemoLine[]
+
+  @@map("memos")
+}
+
+model MemoLine {
+  id               Int           @id @default(autoincrement())
+  memoId           Int           @map("memo_id")
+  memo             Memo          @relation(fields: [memoId], references: [id])
+  greyFabricLotId  Int?          @map("grey_fabric_lot_id")
+  greyFabricLot    GreyFabricLot? @relation(fields: [greyFabricLotId], references: [id])
+  knittingLotId    Int?          @map("knitting_lot_id")
+  knittingLot      KnittingLot?  @relation(fields: [knittingLotId], references: [id])
+  sentWeight       Float         @map("sent_weight")
+  yarnCount        String?       @map("yarn_count")
+  dia              String?
+  gg               String?
+  loopLength       String?       @map("loop_length")
+  fabricName       String?       @map("fabric_name")
+  fabricColour     String?       @map("fabric_colour")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  dyeing           Dyeing?
+
+  @@map("memo_lines")
+}
+
+// ====================== Dyeing (Return from Dyer) ======================
+model Dyeing {
+  id                    Int       @id @default(autoincrement())
+  lotNo                 String    @unique @map("lot_no")
+  hfCode                String?   @map("hf_code")
+  fbNo                  String?   @map("fb_no")
+  /// which memo line this dyeing belongs to
+  memoLineId            Int       @unique @map("memo_line_id")
+  memoLine              MemoLine  @relation(fields: [memoLineId], references: [id])
+  dyerId                Int       @map("dyer_id")
+  dyer                  Dyer      @relation(fields: [dyerId], references: [id])
+  colourId              Int       @map("colour_id")
+  colour                Colour    @relation(fields: [colourId], references: [id])
+  sourceType            String?   @map("source_type")
+  /// sent weight from memo line
+  initialWeight         Float     @map("initial_weight")
+  finalWeight           Float?    @map("final_weight")
+  processLoss           Float?    @map("process_loss")
+  status                String?   @map("status")
+  compactings           Compacting[]
+  noOfRolls             Int?      @map("no_of_rolls")
+  knitterDcNo           String?   @map("knitter_dc_no")
+  /// Derived from lotNo — always kept in sync on save; displayed read-only on frontend
+  companyDcNo           String?   @map("company_dc_no")
+  compacterId           Int?      @map("compacter_id")
+  compacter             Compacter? @relation(fields: [compacterId], references: [id])
+  dateGiven             DateTime? @map("date_given")
+  /// Grey fabric weight received by the dyer
+  receivedGreyWeight    Decimal?  @db.Decimal(10, 2) @map("received_grey_weight")
+  /// Date the grey fabric was received by the dyer
+  greyReceivedDate      DateTime? @map("grey_received_date")
+  /// Weight of dyed fabric dispatched onward to the compacter
+  sentWeightToCompacter Decimal?  @db.Decimal(10, 2) @map("sent_weight_to_compacter")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("dyeings")
+}
+
+model DyeingProgram {
+  id              Int           @id @default(autoincrement())
+  programNo       String        @unique @map("program_no")
+  dyerId          Int           @map("dyer_id")
+  colourId        Int           @map("colour_id")
+  greyFabricLotId Int           @map("grey_fabric_lot_id")
+  startDate       DateTime      @map("start_date")
+  status          String        @default("ACTIVE")
+  remarks         String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  colour          Colour        @relation(fields: [colourId], references: [id])
+  dyer            Dyer          @relation(fields: [dyerId], references: [id])
+  greyFabricLot   GreyFabricLot @relation(fields: [greyFabricLotId], references: [id])
+
+  @@map("dyeing_programs")
+}
+model Compacting {
+  id          Int       @id @default(autoincrement())
+  lotNo       String    @unique @map("lot_no")
+  dyeingId    Int?      @map("dyeing_id")
+  dyeing      Dyeing?   @relation(fields: [dyeingId], references: [id])
+  compacterId Int?      @map("compacter_id")
+  compacter   Compacter? @relation(fields: [compacterId], references: [id])
+  colourId    Int?      @map("colour_id")
+  colour      Colour?   @relation(fields: [colourId], references: [id])
+  finalWeight Float?    @map("final_weight")
+  processLoss Float?    @map("process_loss")
+  status      String?   @map("status")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("compactings")
+}
+
+model InhouseKnittedFabric {
+  id          Int      @id @default(autoincrement())
+  lotNo       String   @unique @map("lot_no")
+  description String?
+  weight      Float?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("inhouse_knitted_fabrics")
+}
+
+model DyeingOrder {
+  id        Int                 @id @default(autoincrement())
+  orderNo   String              @unique @map("order_no")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  lines     DyeingOrderLine[]
+
+  @@map("dyeing_orders")
+}
+
+model DyeingOrderLine {
+  id             Int          @id @default(autoincrement())
+  dyeingOrderId  Int          @map("dyeing_order_id")
+  dyeingOrder    DyeingOrder  @relation(fields: [dyeingOrderId], references: [id])
+  knittingId     Int          @map("knitting_id")
+  knitting       Knitting     @relation(fields: [knittingId], references: [id])
+  quantity       Float
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("dyeing_order_lines")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  tableName   String   @map("table_name")
+  recordId    String   @map("record_id")
+  action      Action
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  performedBy String   @map("performed_by")
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  @@index([tableName, recordId])
+  @@index([performedAt])
+  @@map("audit_logs")
+}
+
+enum Action {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+// ---- Yarn Inward (purchase receipt) ----
+model YarnInward {
+  id                Int       @id @default(autoincrement())
+  receiptDate       DateTime  @default(now()) @map("receipt_date")
+  millId            Int       @map("mill_id")
+  mill              Mill      @relation(fields: [millId], references: [id])
+  deliveryKnitterId Int       @map("delivery_knitter_id")
+  deliveryKnitter   Knitter   @relation(fields: [deliveryKnitterId], references: [id])
+  hfBatch           String?   @map("hf_batch")
+  yarnCount         String?   @map("yarn_count")
+  yarnQuality       String?   @map("yarn_quality")
+  /// "RL" or "VL"
+  rlVl              String?   @map("rl_vl")
+  numBags           Int?      @map("num_bags")
+  /// default 60 in application
+  bagWeight         Decimal?  @map("bag_weight") @db.Decimal(10, 2)
+  /// computed: numBags * bagWeight
+  totalWeight       Decimal   @map("total_weight") @db.Decimal(10, 2)
+  ratePerKg         Decimal?  @map("rate_per_kg") @db.Decimal(10, 2)
+  /// default 2.5
+  cgstRate          Decimal?  @map("cgst_rate") @db.Decimal(5, 2)
+  /// default 2.5
+  sgstRate          Decimal?  @map("sgst_rate") @db.Decimal(5, 2)
+  cgstAmount        Decimal?  @map("cgst_amount") @db.Decimal(10, 2)
+  sgstAmount        Decimal?  @map("sgst_amount") @db.Decimal(10, 2)
+  /// taxable + taxes
+  totalCost         Decimal?  @map("total_cost") @db.Decimal(10, 2)
+  purchaseAccount   String?   @map("purchase_account")
+  remarks           String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  yarnLots          YarnLot[]
+  purchaseOrderId   String?   @map("purchase_order_id")
+  purchaseOrder     PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  millInvoiceNo     String?   @map("mill_invoice_no")
+  millDcNo          String?   @map("mill_dc_no")
+  receivedWeight    Decimal?  @map("received_weight") @db.Decimal(10, 2)
+  status            YarnInwardStatus @default(PENDING) @map("status")
+
+  @@map("yarn_inwards")
+}
+
+// ---- Grey Fabric Inward (External Purchase) ----
+model GreyFabricInward {
+  id              Int             @id @default(autoincrement())
+  receiptDate     DateTime        @default(now()) @map("receipt_date")
+  supplierName    String          @map("supplier_name")
+  fbNo            String?         @map("fb_no")
+  fabricType      String?         @map("fabric_type")
+  colour          String?
+  totalWeight     Decimal         @map("total_weight") @db.Decimal(10, 2)
+  rollCount       Int?            @map("roll_count")
+  ratePerKg       Decimal?        @map("rate_per_kg") @db.Decimal(10, 2)
+  totalCost       Decimal?        @map("total_cost") @db.Decimal(10, 2)
+  purchaseAccount String?         @map("purchase_account")
+  remarks         String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  greyFabricLots  GreyFabricLot[]
+
+  @@map("grey_fabric_inwards")
+}
+
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+  poNumber        String   @unique @map("po_number")
+  hfCode          String?  @unique @map("hf_code")
+  fbNo            String?  @unique @map("fb_no")
+  status          POStatus @default(ACTIVE) @map("status")
+  supplierName    String   @map("supplier_name")
+  supplierAddress String   @map("supplier_address")
+  supplierGST     String   @map("supplier_gst")
+  agent           String?
+  date            DateTime
+  deliveryDate    DateTime @map("delivery_date")
+  poType          String   @default("YARN") @map("po_type")
+  deliveryName    String?  @map("delivery_name")
+  deliveryAddress String?  @map("delivery_address")
+  deliveryGST     String?  @map("delivery_gst")
+  fabricType      String?  @map("fabric_type")
+  fabricColour    String?  @map("fabric_colour")
+  fabricDia       String?  @map("fabric_dia")
+  fabricGsm       String?  @map("fabric_gsm")
+  totalFabricWeight Float? @map("total_fabric_weight")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  items           PurchaseOrderItem[]
+  yarnInwards     YarnInward[]
+
+  @@map("purchase_orders")
+}
+
+
+model PurchaseOrderItem {
+  id               String        @id @default(cuid())
+  purchaseOrderId  String        @map("purchase_order_id")
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  description      String
+  count            String
+  quality          String
+  bags             Int
+  bagWeight        Float         @map("bag_weight")
+  totalWeight      Float         @map("total_weight")
+  rate             Float
+  cgst             Float
+  sgst             Float
+
+  @@map("purchase_order_items")
+}
+
+model WorkflowEvent {
+  id          Int      @id @default(autoincrement())
+  entityType  String
+  entityId    Int
+  event       String
+  oldStatus   String?
+  newStatus   String?
+  createdAt   DateTime @default(now())
+
+  @@map("workflow_events")
+}
+
+model InventoryLedger {
+  id              Int       @id @default(autoincrement())
+  entityType      String
+  entityId        Int
+  itemType        String
+  inwardWeight    Float?
+  outwardWeight   Float?
+  balanceWeight   Float
+  referenceNo     String?
+  lotNo           String?
+  stage           String?
+  remarks         String?
+  createdAt       DateTime  @default(now())
+
+  // New fields for production planning reservations
+  transactionType String?
+  quantity        Float?
+  referenceType   String?
+  referenceId     Int?
+
+  @@index([entityType, entityId])
+  @@index([itemType])
+  @@index([lotNo])
+  @@index([stage])
+  @@index([itemType, createdAt])
+  @@index([lotNo, itemType])
+  @@map("inventory_ledgers")
+}
+
+model InventorySnapshot {
+  id            Int      @id @default(autoincrement())
+  snapshotDate  DateTime
+  itemType      String
+  balanceWeight Float
+  createdAt     DateTime @default(now())
+
+  @@index([snapshotDate])
+  @@index([itemType])
+  @@map("inventory_snapshots")
+}
+
+model LotTracker {
+  id                Int       @id @default(autoincrement())
+  lotNo             String    @unique @map("lot_no")
+  currentStatus     String    @default("PENDING") @map("current_status")
+  activeStage       String?   @map("active_stage")
+  completionPercent Float     @default(0) @map("completion_percent")
+  totalWeight       Float     @default(0) @map("total_weight")
+  completedWeight   Float     @default(0) @map("completed_weight")
+  balanceWeight     Float     @default(0) @map("balance_weight")
+  delayed           Boolean   @default(false)
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  lastActivityAt    DateTime? @map("last_activity_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([currentStatus])
+  @@index([delayed])
+  @@index([activeStage])
+  @@map("lot_trackers")
+}
+
+model LotEvent {
+  id             Int       @id @default(autoincrement())
+  lotNo          String    @map("lot_no")
+  eventType      String    @map("event_type")
+  previousStatus String?   @map("previous_status")
+  newStatus      String?   @map("new_status")
+  remarks        String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([lotNo])
+  @@index([eventType])
+  @@map("lot_events")
+}
+
+enum ProductionPlanStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+
+enum ProductionPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model ProductionPlan {
+  id                Int                  @id @default(autoincrement())
+  planNo            String               @unique
+  lotNo             String
+  stage             String
+  plannedWeight     Float
+  completedWeight   Float                @default(0)
+  plannedDate       DateTime
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  priority          ProductionPriority
+  status            ProductionPlanStatus
+  delayed           Boolean              @default(false)
+  remarks           String?
+  createdBy         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([lotNo, stage, plannedDate])
+  @@index([lotNo])
+  @@index([status])
+  @@index([stage])
+  @@index([plannedDate])
+  @@index([priority])
+  @@index([delayed])
+}
+
+
+model ProductionEvent {
+  id               Int       @id @default(autoincrement())
+  productionPlanId Int?
+  eventType        String
+  message          String
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+
+  @@index([productionPlanId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  user      String
+  action    String
+  module    String
+  details   String?
+  source    String   @default("IMPORT")
+  createdAt DateTime @default(now())
+
+  @@unique([date, user, action, module])
+  @@index([date])
+  @@index([user])
+  @@index([module])
+}
+
+
+
+
